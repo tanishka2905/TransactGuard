@@ -1,0 +1,172 @@
+export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type TransactionStatus = 'APPROVED' | 'FLAGGED' | 'BLOCKED';
+export type AlertStatus = 'NEW' | 'REVIEWING' | 'RESOLVED' | 'FALSE_POSITIVE' | 'CONFIRMED_FRAUD';
+
+export interface FeatureBreakdown {
+  ml_contribution: number;
+  anomaly_contribution: number;
+  rule_contribution: number;
+  velocity_contribution: number;
+  ml_probability_raw?: number;
+  anomaly_score_raw?: number;
+  rule_score_raw?: number;
+  velocity_score_raw?: number;
+  speed_kmh?: number;
+  amount_ratio?: number;
+  is_new_device?: boolean;
+  is_night?: boolean;
+  rules_detail?: Record<string, number>;
+  ml_detail?: Record<string, number>;
+  p2p_sender?: any;
+  p2p_receiver?: any;
+}
+
+export interface Transaction {
+  id: string;
+  user_id: string;
+  amount: number;
+  currency: string;
+  timestamp: string;
+  payment_method: string;
+  merchant_id?: string;
+  merchant_category?: string;
+  device_id: string;
+  device_fingerprint?: string;
+  ip_address?: string;
+  network_type?: string;
+  location_name?: string;
+  latitude?: number;
+  longitude?: number;
+  beneficiary_id?: string;
+  beneficiary_name?: string;
+  beneficiary_user_id?: string;
+  sender_balance_after?: number;
+  beneficiary_balance_after?: number;
+  transaction_type?: string;
+  status: TransactionStatus;
+  risk_score: number;
+  risk_level: RiskLevel;
+  ml_probability: number;
+  anomaly_score: number;
+  rule_score: number;
+  velocity_score: number;
+  reasons: string[];
+  feature_breakdown: FeatureBreakdown;
+  source: string;
+  is_live: boolean;
+  created_at?: string;
+}
+
+export interface FraudAlert {
+  id: string;
+  transaction_id: string;
+  user_id: string;
+  risk_score: number;
+  risk_level: RiskLevel;
+  reasons: string[];
+  status: AlertStatus;
+  analyst_notes?: string;
+  assigned_to?: string;
+  created_at: string;
+  updated_at?: string;
+  transaction?: Transaction;
+}
+
+export interface HourlyVolumeItem {
+  hour: string;
+  total_transactions: number;
+  flagged_transactions: number;
+  volume_amount: number;
+}
+
+export interface DashboardMetrics {
+  live_transactions_count: number;
+  transactions_today_count: number;
+  total_volume_today: number;
+  avg_transaction_value: number;
+  total_fraud_alerts: number;
+  active_critical_alerts: number;
+  fraud_rate_percentage: number;
+  avg_latency_ms: number;
+  risk_distribution: {
+    LOW: number;
+    MEDIUM: number;
+    HIGH: number;
+    CRITICAL: number;
+  };
+  hourly_volume: HourlyVolumeItem[];
+  payment_method_distribution: Record<string, number>;
+  recent_alerts: FraudAlert[];
+}
+
+export interface UserBehaviorProfile {
+  user_id: string;
+  avg_amount: number;
+  std_amount: number;
+  median_amount: number;
+  max_amount: number;
+  normal_amount_min: number;
+  normal_amount_max: number;
+  preferred_hours: number[];
+  night_txn_ratio: number;
+  known_devices: string[];
+  known_locations: string[];
+  typical_lat?: number;
+  typical_lon?: number;
+  frequent_beneficiaries: string[];
+  avg_daily_txns: number;
+  total_txns: number;
+  last_updated: string;
+}
+
+export interface UserSummary {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  city?: string;
+  balance: number;
+  currency: string;
+  avatar?: string;
+  account_number?: string;
+  risk_segment: string;
+  avg_amount: number;
+  std_amount?: number;
+  total_txns: number;
+  known_devices_count: number;
+  known_devices?: string[];
+  primary_location: string;
+  frequent_beneficiaries?: string[];
+}
+
+export interface P2PPreScreenResult {
+  sender_id: string;
+  sender_name: string;
+  sender_balance: number;
+  sender_balance_after: number;
+  receiver_id: string;
+  receiver_name: string;
+  receiver_balance: number;
+  receiver_balance_after: number;
+  amount: number;
+  currency: string;
+  risk_score: number;
+  risk_level: RiskLevel;
+  ml_probability: number;
+  anomaly_score: number;
+  rule_score: number;
+  velocity_score: number;
+  reasons: string[];
+  warnings: string[];
+  requires_confirmation: boolean;
+  is_new_beneficiary: boolean;
+  sender_city: string;
+  receiver_city: string;
+}
+
+export interface CurrencyConfig {
+  code: string;
+  symbol: string;
+  name: string;
+  rateToInr: number;
+}

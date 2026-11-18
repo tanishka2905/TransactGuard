@@ -1,0 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-void text-zinc-100 font-sans antialiased selection:bg-rose-500/30 selection:text-rose-200;
+    overflow-x: hidden;
+  }
+}
+
+/* Custom sleek scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  background: rgba(17, 18, 21, 0.75);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.glass-card {
+  background: #111215;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Cyber Grid Backgrounds */
+.bg-grid-pattern {
+  background-size: 44px 44px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+}
+
+.bg-dot-pattern {
+  background-size: 28px 28px;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1.2px, transparent 1.2px);
+}
+
+.aurora-glow-1 {
+  background: radial-gradient(circle at 50% 50%, rgba(244, 63, 94, 0.16) 0%, rgba(244, 63, 94, 0) 70%);
+}
+
+.aurora-glow-2 {
+  background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.2) 0%, rgba(99, 102, 241, 0) 70%);
+}
+
+.aurora-glow-3 {
+  background: radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.16) 0%, rgba(16, 185, 129, 0) 70%);
+}
+
+.shimmer-text {
+  background: linear-gradient(90deg, #ffffff 0%, #cbd5e1 30%, #94a3b8 50%, #cbd5e1 70%, #ffffff 100%);
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: shine 6s linear infinite;
+}
+
+@keyframes shine {
+  to {
+    background-position: 200% center;
+  }
+}

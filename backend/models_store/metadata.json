@@ -1,0 +1,50 @@
+{
+  "version": "v2.4.0",
+  "model_type": "RandomForestClassifier + IsolationForest",
+  "training_samples": 13500,
+  "test_samples": 4500,
+  "roc_auc": 1.0,
+  "pr_auc": 1.0,
+  "confusion_matrix": [
+    [
+      4419,
+      0
+    ],
+    [
+      0,
+      81
+    ]
+  ],
+  "feature_importances": {
+    "amount": 0.2702,
+    "distance_from_base_km": 0.1986,
+    "amount_ratio": 0.1738,
+    "velocity_1h": 0.1008,
+    "z_score": 0.0756,
+    "velocity_5m": 0.0634,
+    "is_new_location": 0.0459,
+    "velocity_24h": 0.0323,
+    "speed_kmh": 0.0278,
+    "is_preferred_hour": 0.0106,
+    "is_new_device": 0.0005,
+    "hour": 0.0004,
+    "is_new_beneficiary": 0.0003,
+    "is_night": 0.0
+  },
+  "feature_columns": [
+    "amount",
+    "amount_ratio",
+    "z_score",
+    "hour",
+    "is_night",
+    "is_preferred_hour",
+    "is_new_device",
+    "is_new_location",
+    "distance_from_base_km",
+    "speed_kmh",
+    "velocity_5m",
+    "velocity_1h",
+    "velocity_24h",
+    "is_new_beneficiary"
+  ]
+}
