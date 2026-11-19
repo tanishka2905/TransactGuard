@@ -14,7 +14,8 @@ import {
   KeyRound,
   Lock,
   Clock,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 import type { UserSummary, P2PPreScreenResult, Transaction, CurrencyConfig } from '../types';
 import { api } from '../services/api';
@@ -475,29 +476,39 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
             </div>
 
             {/* FEATURE 1: Real-Time Geo/Temporal Telemetry Verification Strip */}
-            <div className="p-3.5 rounded-xl bg-zinc-900/50 border border-white/[0.06] flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span className="text-zinc-400">Device Location Telemetry:</span>
-                <span className="text-emerald-300 font-semibold">{geo.cityName}</span>
-                {geo.latitude !== null && geo.longitude !== null && (
-                  <span className="text-zinc-400 text-[11px]">
-                    ({geo.latitude.toFixed(4)}°, {geo.longitude.toFixed(4)}°)
+            <div className="p-3.5 rounded-xl bg-zinc-900/50 border border-white/[0.06] space-y-2 text-xs font-mono">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                   </span>
-                )}
-              </div>
+                  <span className="text-zinc-400">Device Location Telemetry:</span>
+                  <span className="text-emerald-300 font-bold">{geo.cityName}</span>
+                  {geo.latitude !== null && geo.longitude !== null && (
+                    <span className="text-zinc-500 text-[11px]">
+                      ({geo.latitude.toFixed(4)}°, {geo.longitude.toFixed(4)}°)
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => geo.refresh()}
+                    title="Re-detect live GPS / IP location"
+                    className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors ml-1"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${geo.isLoading ? 'animate-spin text-emerald-400' : ''}`} />
+                  </button>
+                </div>
 
-              <div className="flex items-center gap-2 text-zinc-400">
-                <Clock className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Local Time: <span className="text-zinc-200 font-medium">{geo.localTimeStr}</span></span>
-                {geo.isNight && (
-                  <span className="text-amber-300 text-[10px] bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                    🌙 Nocturnal Flag
-                  </span>
-                )}
+                <div className="flex items-center gap-2 text-zinc-400">
+                  <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Local Time: <span className="text-zinc-200 font-medium">{geo.localTimeStr}</span></span>
+                  {geo.isNight && (
+                    <span className="text-amber-300 text-[10px] bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                      🌙 Nocturnal Flag
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -645,7 +656,7 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
                 is_live: true,
               }}
               senderName={preScreenData.sender_name}
-              senderCity={preScreenData.sender_city}
+              senderCity={geo.cityName || preScreenData.sender_city}
               senderBalanceBefore={preScreenData.sender_balance}
               receiverName={preScreenData.receiver_name}
               receiverCity={preScreenData.receiver_city}
@@ -752,7 +763,7 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
               <div>
                 <span className="text-zinc-500 text-[10px] block uppercase">Sender (Held)</span>
                 <span className="text-white font-semibold">{sender?.name || completedTxn.user_id}</span>
-                <span className="text-zinc-400 block text-[11px]">{sender?.city || 'Registered User'}</span>
+                <span className="text-zinc-400 block text-[11px]">{completedTxn.location_name || geo.cityName || sender?.city || 'Registered User'}</span>
               </div>
               <div>
                 <span className="text-zinc-500 text-[10px] block uppercase">Beneficiary (Pending)</span>
@@ -896,7 +907,7 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
             <SideBySideTxnView
               transaction={completedTxn}
               senderName={sender?.name}
-              senderCity={sender?.city}
+              senderCity={completedTxn.location_name || geo.cityName || sender?.city}
               receiverName={receiver?.name}
               receiverCity={receiver?.city}
             />

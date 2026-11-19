@@ -38,7 +38,7 @@ export const SideBySideTxnView: React.FC<SideBySideTxnViewProps> = ({
 
   // Resolve Sender Details
   const sName = senderName || p2pSender?.name || transaction.user_id;
-  const sCity = senderCity || p2pSender?.city || transaction.location_name || 'Mumbai, IN';
+  const sCity = transaction.location_name || senderCity || p2pSender?.city || 'Moradabad, UP, IN';
   const sBalAfter = transaction.sender_balance_after ?? p2pSender?.balance_after;
   const sBalBefore = senderBalanceBefore ?? p2pSender?.balance_before ?? (sBalAfter !== undefined ? sBalAfter + transaction.amount : undefined);
 

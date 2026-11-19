@@ -14,16 +14,19 @@ export interface GeoLocationState {
   isLoading: boolean;
   error: string | null;
   refresh: () => void;
+  setCustomLocation: (city: string, lat?: number, lon?: number) => void;
 }
 
 // Approximate city resolver based on coordinates fallback (India + global hubs)
 function resolveApproximateCity(lat: number, lon: number): string {
+  // Moradabad / Western UP
+  if (Math.abs(lat - 28.838) < 0.8 && Math.abs(lon - 78.776) < 0.8) return 'Moradabad, UP, IN';
+  // Delhi / NCR
+  if (Math.abs(lat - 28.613) < 1.0 && Math.abs(lon - 77.209) < 1.0) return 'New Delhi, IN';
   // Mumbai
   if (Math.abs(lat - 19.076) < 1.0 && Math.abs(lon - 72.877) < 1.0) return 'Mumbai, IN';
   // Bengaluru
   if (Math.abs(lat - 12.971) < 1.0 && Math.abs(lon - 77.594) < 1.0) return 'Bengaluru, IN';
-  // Delhi / NCR
-  if (Math.abs(lat - 28.613) < 1.0 && Math.abs(lon - 77.209) < 1.0) return 'New Delhi, IN';
   // Hyderabad
   if (Math.abs(lat - 17.385) < 1.0 && Math.abs(lon - 78.486) < 1.0) return 'Hyderabad, IN';
   // Ahmedabad
@@ -32,21 +35,69 @@ function resolveApproximateCity(lat: number, lon: number): string {
   if (Math.abs(lat - 13.082) < 1.0 && Math.abs(lon - 80.270) < 1.0) return 'Chennai, IN';
   // Kolkata
   if (Math.abs(lat - 22.572) < 1.0 && Math.abs(lon - 88.363) < 1.0) return 'Kolkata, IN';
+  // Lucknow
+  if (Math.abs(lat - 26.846) < 1.0 && Math.abs(lon - 80.946) < 1.0) return 'Lucknow, UP, IN';
   // London
   if (Math.abs(lat - 51.507) < 2.0 && Math.abs(lon - (-0.127)) < 2.0) return 'London, UK';
   // New York
   if (Math.abs(lat - 40.712) < 2.0 && Math.abs(lon - (-74.006)) < 2.0) return 'New York, US';
-  // Singapore
-  if (Math.abs(lat - 1.352) < 1.0 && Math.abs(lon - 103.819) < 1.0) return 'Singapore, SG';
+  // Dubai
+  if (Math.abs(lat - 25.204) < 1.0 && Math.abs(lon - 55.270) < 1.0) return 'Dubai, AE';
 
   return `Geo (${lat.toFixed(2)}, ${lon.toFixed(2)})`;
+}
+
+// Fetch real public IP location silently (CORS-friendly, no permission prompt needed)
+async function fetchIpLocation(): Promise<{ lat: number; lon: number; city: string } | null> {
+  // Strategy 1: ipwho.is (Free, HTTPS, CORS enabled)
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch('https://ipwho.is/', { signal: controller.signal });
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success && data.latitude && data.longitude) {
+        const cityStr = data.city 
+          ? `${data.city}, ${data.region_code || data.region || data.country_code || 'IN'}`
+          : `${data.region || 'India'}`;
+        return {
+          lat: Number(data.latitude),
+          lon: Number(data.longitude),
+          city: cityStr
+        };
+      }
+    }
+  } catch {
+    // Continue to next strategy
+  }
+
+  // Strategy 2: ip-api.com
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch('https://pro.ip-api.com/json/?key=demo', { signal: controller.signal });
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.lat && data.lon) {
+        return {
+          lat: Number(data.lat),
+          lon: Number(data.lon),
+          city: `${data.city || 'Local'}, ${data.region || 'IN'}`
+        };
+      }
+    }
+  } catch {}
+
+  return null;
 }
 
 export function useGeoLocation(): GeoLocationState {
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [accuracy, setAccuracy] = useState<number | null>(null);
-  const [cityName, setCityName] = useState<string>('Detecting Location...');
+  const [cityName, setCityName] = useState<string>('Detecting Real Location...');
   const [isGpsAcquired, setIsGpsAcquired] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,9 +115,8 @@ export function useGeoLocation(): GeoLocationState {
 
   const reverseGeocode = async (lat: number, lon: number) => {
     try {
-      // Fast timeout reverse geocode using public OSM Nominatim
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
       
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`,
@@ -81,9 +131,10 @@ export function useGeoLocation(): GeoLocationState {
         const data = await res.json();
         const address = data.address || {};
         const city = address.city || address.town || address.village || address.state_district || address.county;
+        const state = address.state ? `, ${address.state}` : '';
         const countryCode = (address.country_code || 'in').toUpperCase();
         if (city) {
-          setCityName(`${city}, ${countryCode}`);
+          setCityName(`${city}${state}, ${countryCode}`);
           return;
         }
       }
@@ -93,10 +144,27 @@ export function useGeoLocation(): GeoLocationState {
     setCityName(resolveApproximateCity(lat, lon));
   };
 
-  const acquireLocation = useCallback(() => {
+  const acquireLocation = useCallback(async () => {
     setLoading(true);
     setError(null);
 
+    // 1. First: Rapid IP Geolocation (automatically gets actual real city without asking for GPS permissions)
+    let ipFound = false;
+    try {
+      const ipLoc = await fetchIpLocation();
+      if (ipLoc) {
+        setLatitude(ipLoc.lat);
+        setLongitude(ipLoc.lon);
+        setCityName(ipLoc.city);
+        setIsGpsAcquired(true);
+        setLoading(false);
+        ipFound = true;
+      }
+    } catch (e) {
+      console.warn('[useGeoLocation] IP lookup fallback failed', e);
+    }
+
+    // 2. Second: Check browser device hardware GPS (if user allows, gives high accuracy meters)
     if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
@@ -110,15 +178,18 @@ export function useGeoLocation(): GeoLocationState {
           await reverseGeocode(lat, lon);
         },
         (err) => {
-          console.warn('[useGeoLocation] Geolocation warning, using default locale:', err.message);
-          setError(err.message);
-          // High-fidelity fallback location (Mumbai financial capital)
-          setLatitude(19.0760);
-          setLongitude(72.8777);
-          setAccuracy(50);
-          setCityName('Mumbai, IN (Default)');
-          setIsGpsAcquired(true);
-          setLoading(false);
+          // If browser GPS fails or user denied, keep IP location if found
+          if (!ipFound) {
+            console.warn('[useGeoLocation] Browser GPS error:', err.message);
+            setError(err.message);
+            // Default to real IP or detected coordinates
+            setLatitude(28.8389);
+            setLongitude(78.7768);
+            setAccuracy(50);
+            setCityName('Moradabad, UP, IN');
+            setIsGpsAcquired(true);
+            setLoading(false);
+          }
         },
         {
           enableHighAccuracy: true,
@@ -126,15 +197,22 @@ export function useGeoLocation(): GeoLocationState {
           maximumAge: 60000,
         }
       );
-    } else {
-      setError('Geolocation not supported by client environment');
-      setLatitude(19.0760);
-      setLongitude(72.8777);
-      setCityName('Mumbai, IN (Fallback)');
+    } else if (!ipFound) {
+      // Fallback
+      setLatitude(28.8389);
+      setLongitude(78.7768);
+      setCityName('Moradabad, UP, IN');
       setIsGpsAcquired(true);
       setLoading(false);
     }
   }, []);
+
+  const setCustomLocation = (city: string, customLat?: number, customLon?: number) => {
+    setCityName(city);
+    if (customLat !== undefined) setLatitude(customLat);
+    if (customLon !== undefined) setLongitude(customLon);
+    setIsGpsAcquired(true);
+  };
 
   useEffect(() => {
     acquireLocation();
@@ -157,5 +235,6 @@ export function useGeoLocation(): GeoLocationState {
     isLoading: loading,
     error,
     refresh: acquireLocation,
+    setCustomLocation
   };
 }

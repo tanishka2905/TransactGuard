@@ -1,7 +1,7 @@
 {
   "version": "v3.0.0",
-  "champion_model_id": "consensus_ensemble",
-  "champion_model_name": "Consensus Ensemble",
+  "champion_model_id": "lightgbm",
+  "champion_model_name": "LightGBM",
   "active_models_count": 6,
   "dataset": {
     "total_samples": 20000,

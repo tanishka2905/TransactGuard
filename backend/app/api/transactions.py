@@ -364,7 +364,7 @@ def pre_screen_p2p_transfer(payload: P2PTransferRequest, db: Session = Depends(g
         warnings=warnings,
         requires_confirmation=(risk_level in ["MEDIUM", "HIGH", "CRITICAL"] or is_new or payload.amount > 5000.0),
         is_new_beneficiary=is_new,
-        sender_city=sender.city or "Mumbai, IN",
+        sender_city=payload.location_name or sender.city or "Moradabad, UP, IN",
         receiver_city=receiver.city or "Bengaluru, IN"
     )
 
@@ -444,7 +444,7 @@ async def execute_p2p_transfer(payload: P2PTransferRequest, db: Session = Depend
         "name": sender.name,
         "balance_before": sender_bal,
         "balance_after": sender.balance,
-        "city": sender.city
+        "city": payload.location_name or sender.city or "Moradabad, UP, IN"
     }
     feature_breakdown["p2p_receiver"] = {
         "id": receiver.id,
