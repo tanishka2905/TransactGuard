@@ -9,12 +9,18 @@ import {
   Send, 
   Users, 
   Info,
-  ChevronRight
+  ChevronRight,
+  MapPin,
+  KeyRound,
+  Lock,
+  Clock,
+  Sparkles
 } from 'lucide-react';
 import type { UserSummary, P2PPreScreenResult, Transaction, CurrencyConfig } from '../types';
 import { api } from '../services/api';
 import { SideBySideTxnView } from './SideBySideTxnView';
 import { formatCurrencyAmount, getStoredCurrency } from '../utils/currency';
+import { useGeoLocation } from '../hooks/useGeoLocation';
 
 interface P2PTransferModalProps {
   isOpen: boolean;
@@ -41,13 +47,18 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
   const [note, setNote] = useState<string>('Instant P2P settlement');
   const [currencyConfig, setCurrencyConfig] = useState<CurrencyConfig>(getStoredCurrency());
 
-  // Multi-step modal state: 'compose' | 'confirm_popup' | 'success'
-  const [step, setStep] = useState<'compose' | 'confirm_popup' | 'success'>('compose');
+  // Multi-step modal state: 'compose' | 'confirm_popup' | 'blocked_challenge' | 'success'
+  const [step, setStep] = useState<'compose' | 'confirm_popup' | 'blocked_challenge' | 'success'>('compose');
   const [isLoadingPreScreen, setIsLoadingPreScreen] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [isConfirmingGenuine, setIsConfirmingGenuine] = useState(false);
+  const [otpCode, setOtpCode] = useState<string>('749201');
   const [preScreenData, setPreScreenData] = useState<P2PPreScreenResult | null>(null);
   const [completedTxn, setCompletedTxn] = useState<Transaction | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Real-time automatic geolocation and temporal telemetry hook
+  const geo = useGeoLocation();
 
   // Sync currency changes
   useEffect(() => {
@@ -125,6 +136,10 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
         currency: String(currencyConfig?.code || 'TGX'),
         payment_method: String(paymentMethod || 'P2P_TRANSFER'),
         note: String(note || ''),
+        latitude: geo.latitude ?? undefined,
+        longitude: geo.longitude ?? undefined,
+        location_name: geo.cityName,
+        timestamp: geo.timestampIso
       });
       setPreScreenData(preScreen);
       // Advance to the message pop-up confirmation modal!
@@ -149,12 +164,54 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
         currency: String(currencyConfig?.code || 'TGX'),
         payment_method: String(paymentMethod || 'P2P_TRANSFER'),
         note: String(note || ''),
+        latitude: geo.latitude ?? undefined,
+        longitude: geo.longitude ?? undefined,
+        location_name: geo.cityName,
+        timestamp: geo.timestampIso
       });
 
       setCompletedTxn(txn);
-      setStep('success');
 
-      // Update local users balances
+      // FEATURE 3: If blocked or critical threat, present the dedicated self-healing confirmation challenge
+      if (txn.status === 'BLOCKED' || txn.risk_level === 'CRITICAL') {
+        setStep('blocked_challenge');
+      } else {
+        setStep('success');
+        // Update local users balances
+        setUsers((prev) =>
+          prev.map((u) => {
+            if (u.id === senderId) {
+              return { ...u, balance: Math.max(0, u.balance - numericAmount) };
+            }
+            if (u.id === receiverId) {
+              return { ...u, balance: u.balance + numericAmount };
+            }
+            return u;
+          })
+        );
+      }
+
+      if (onTransactionCompleted) {
+        onTransactionCompleted(txn);
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to complete transaction.');
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  // FEATURE 3 Action: "Verify & Confirm as Genuine (Self-Healing Unblock)"
+  const handleConfirmGenuine = async () => {
+    if (!completedTxn) return;
+    try {
+      setIsConfirmingGenuine(true);
+      setErrorMessage(null);
+
+      const unblockedTxn = await api.confirmGenuine(completedTxn.id);
+      setCompletedTxn(unblockedTxn);
+
+      // Settle balances in local user profiles
       setUsers((prev) =>
         prev.map((u) => {
           if (u.id === senderId) {
@@ -167,13 +224,14 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
         })
       );
 
+      setStep('success');
       if (onTransactionCompleted) {
-        onTransactionCompleted(txn);
+        onTransactionCompleted(unblockedTxn);
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to complete transaction.');
+      setErrorMessage(err.message || 'Failed to authorize and unblock transfer.');
     } finally {
-      setIsExecuting(false);
+      setIsConfirmingGenuine(false);
     }
   };
 
@@ -203,12 +261,46 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-3">
+            {/* FEATURE 1: Real-Time GPS & Temporal Telemetry Radar Badge */}
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900/90 border border-white/[0.08] text-xs font-mono shadow-sm">
+              {geo.hasGeo ? (
+                <>
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-emerald-400 font-semibold">📍 Real GPS Acquired:</span>
+                  <span className="text-zinc-200 font-medium">{geo.cityName}</span>
+                  <span className="text-zinc-500 text-[10px]">({geo.latitude?.toFixed(2)}°, {geo.longitude?.toFixed(2)}°)</span>
+                  <span className="text-zinc-400 text-[10px]">· {geo.localTimeStr}</span>
+                  {geo.isNight && (
+                    <span className="text-amber-300 text-[10px] bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30">
+                      🌙 Night
+                    </span>
+                  )}
+                </>
+              ) : geo.isLoading ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+                  <span className="text-zinc-400">Acquiring Real GPS...</span>
+                </>
+              ) : (
+                <>
+                  <MapPin className="w-3.5 h-3.5 text-zinc-500" />
+                  <span className="text-zinc-400">{geo.cityName}</span>
+                  <span className="text-zinc-500 text-[10px]">· {geo.localTimeStr}</span>
+                </>
+              )}
+            </div>
+
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Error Alert Banner */}
@@ -380,6 +472,33 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
                 placeholder="e.g. Instant P2P settlement"
                 className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-white/[0.08] text-white font-mono text-xs focus:outline-none focus:border-indigo-500/60"
               />
+            </div>
+
+            {/* FEATURE 1: Real-Time Geo/Temporal Telemetry Verification Strip */}
+            <div className="p-3.5 rounded-xl bg-zinc-900/50 border border-white/[0.06] flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-zinc-400">Device Location Telemetry:</span>
+                <span className="text-emerald-300 font-semibold">{geo.cityName}</span>
+                {geo.latitude !== null && geo.longitude !== null && (
+                  <span className="text-zinc-400 text-[11px]">
+                    ({geo.latitude.toFixed(4)}°, {geo.longitude.toFixed(4)}°)
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 text-zinc-400">
+                <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Local Time: <span className="text-zinc-200 font-medium">{geo.localTimeStr}</span></span>
+                {geo.isNight && (
+                  <span className="text-amber-300 text-[10px] bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                    🌙 Nocturnal Flag
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Action Bar */}
@@ -580,6 +699,168 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
                     </>
                   )}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================
+            FEATURE 3: BLOCKED P2P TRANSACTION CONFIRMATION & SELF-HEALING UNBLOCK
+           ======================================================== */}
+        {step === 'blocked_challenge' && completedTxn && (
+          <div className="p-6 space-y-5 animate-scaleUp">
+            {/* Suspended Alert Banner */}
+            <div className="p-5 rounded-2xl bg-rose-950/40 border border-rose-500/50 flex items-start gap-4 shadow-glow-danger">
+              <div className="p-3 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30 shrink-0">
+                <ShieldAlert className="w-6 h-6 animate-pulse" />
+              </div>
+              <div className="flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-mono font-bold text-rose-200 uppercase tracking-wider">
+                    SECURITY INTERVENTION: P2P TRANSFER SUSPENDED
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold">
+                    STATUS: {completedTxn.status}
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/50 text-zinc-300">
+                    RISK SCORE: {completedTxn.risk_score} / 100
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-300 font-mono mt-1.5 leading-relaxed">
+                  The Champion AI Model ({completedTxn.active_champion_model || 'Consensus Ensemble'}) intercepted this transaction 
+                  due to suspicious behavioral deviation. Funds have NOT been settled yet.
+                </p>
+
+                {completedTxn.reasons && completedTxn.reasons.length > 0 && (
+                  <div className="mt-3 p-3 rounded-xl bg-black/40 border border-rose-500/20 space-y-1">
+                    <span className="text-[10px] font-mono font-bold text-rose-300 uppercase tracking-wider block">
+                      Autonomous Engine Threat Indicators:
+                    </span>
+                    {completedTxn.reasons.map((r, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-xs font-mono text-zinc-300">
+                        <span className="text-rose-400 mt-0.5">•</span>
+                        <span>{r}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Suspended Transaction Details Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 rounded-xl bg-zinc-900/60 border border-white/[0.08] text-xs font-mono">
+              <div>
+                <span className="text-zinc-500 text-[10px] block uppercase">Sender (Held)</span>
+                <span className="text-white font-semibold">{sender?.name || completedTxn.user_id}</span>
+                <span className="text-zinc-400 block text-[11px]">{sender?.city || 'Registered User'}</span>
+              </div>
+              <div>
+                <span className="text-zinc-500 text-[10px] block uppercase">Beneficiary (Pending)</span>
+                <span className="text-white font-semibold">{receiver?.name || completedTxn.beneficiary_name}</span>
+                <span className="text-zinc-400 block text-[11px]">{receiver?.city || 'Registered User'}</span>
+              </div>
+              <div>
+                <span className="text-zinc-500 text-[10px] block uppercase">Transfer Amount</span>
+                <span className="text-lg font-bold text-rose-400">
+                  {formatCurrencyAmount(completedTxn.amount, { code: completedTxn.currency })}
+                </span>
+                <span className="text-zinc-500 text-[10px] block">ML Prob: {((completedTxn.ml_probability || 0) * 100).toFixed(1)}%</span>
+              </div>
+            </div>
+
+            {/* Self-Healing 2FA / OTP Verification Card */}
+            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-indigo-500/30 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+                    Self-Healing Authorization: Verify & Confirm Genuine
+                  </h4>
+                  <p className="text-[11px] text-zinc-400 font-mono">
+                    If this transfer is genuine, complete one-time authorization to immediately unblock the payment and update your Fraud DNA profile.
+                  </p>
+                </div>
+              </div>
+
+              {/* OTP Simulation Input */}
+              <div className="p-4 rounded-xl bg-zinc-950 border border-white/[0.06] space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="text-xs font-mono text-zinc-300 font-semibold flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Enter 6-Digit One-Time Security PIN:</span>
+                  </label>
+                  <span className="text-[10px] font-mono text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                    Simulation Code: 749201
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value)}
+                    className="w-48 px-4 py-2.5 rounded-xl bg-zinc-900 border border-indigo-500/40 text-center text-white font-mono text-lg font-bold tracking-widest focus:outline-none focus:border-indigo-400"
+                    placeholder="749201"
+                  />
+                  <div className="text-xs font-mono text-zinc-400">
+                    <p className="text-emerald-400 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Adaptive Device Whitelisting Activated
+                    </p>
+                    <p className="text-[11px] text-zinc-500">
+                      Unblocking permanently records <span className="text-zinc-300">{geo.cityName}</span> into your trusted behavioral envelope.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions Footer */}
+              <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06]">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 rounded-xl text-xs font-mono text-zinc-400 hover:text-white border border-white/[0.08] hover:bg-white/[0.04] transition-colors"
+                >
+                  Keep Suspended / Abort
+                </button>
+
+                <div className="flex items-center gap-3">
+                  {onViewForensics && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onViewForensics(completedTxn);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-mono text-xs font-semibold border border-white/[0.08] transition-colors"
+                    >
+                      <span>Inspect AI Forensics</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={isConfirmingGenuine}
+                    onClick={handleConfirmGenuine}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-mono font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all disabled:opacity-50"
+                  >
+                    {isConfirmingGenuine ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Authorizing & Unblocking...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Verify & Confirm as Genuine (Unblock)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

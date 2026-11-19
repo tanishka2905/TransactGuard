@@ -137,6 +137,31 @@ export function App() {
     setActiveAlertsCount((c) => c + 1);
   }, []);
 
+  // FEATURE 3: Real-Time State Synchrony on Self-Healing Unblock
+  useEffect(() => {
+    const handleUnblocked = (e: any) => {
+      const payload = e.detail;
+      const unblockedTxnId = payload?.transaction_id || payload?.id;
+
+      if (unblockedTxnId) {
+        setTransactions((prev) =>
+          prev.map((t) => (t.id === unblockedTxnId ? { ...t, status: 'APPROVED' as any } : t))
+        );
+        setActiveAlertsCount((c) => Math.max(0, c - 1));
+        // Dismiss any active toast notifications for this transaction
+        setToasts((prev) => prev.filter((t) => t.transaction?.id !== unblockedTxnId));
+      }
+    };
+
+    window.addEventListener('transaction_unblocked', handleUnblocked);
+    window.addEventListener('alert_resolved', handleUnblocked);
+
+    return () => {
+      window.removeEventListener('transaction_unblocked', handleUnblocked);
+      window.removeEventListener('alert_resolved', handleUnblocked);
+    };
+  }, []);
+
   // Connect WebSocket
   const { isConnected } = useWebSocket(handleNewTransaction, handleNewAlert);
 

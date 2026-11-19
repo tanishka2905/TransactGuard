@@ -46,7 +46,10 @@ async def process_transaction(payload: TransactionCreate, db: Session = Depends(
     """
     # 1. Enforce server-generated timestamp
     now = datetime.datetime.utcnow()
-    txn_time = payload.timestamp if payload.timestamp and payload.timestamp <= now else now
+    raw_time = payload.timestamp
+    if raw_time and raw_time.tzinfo is not None:
+        raw_time = raw_time.replace(tzinfo=None)
+    txn_time = raw_time if raw_time and raw_time <= now else now
     
     # 2. Check if user exists, else auto-register as baseline customer
     user = db.query(User).filter(User.id == payload.user_id).first()
@@ -73,8 +76,8 @@ async def process_transaction(payload: TransactionCreate, db: Session = Depends(
         beneficiary_id=payload.beneficiary_id
     )
 
-    # 4. Run ML Models & Rules
-    ml_prob, ml_contributions = MLEngine.predict_fraud_probability(features)
+    # 4. Run ML Models & Rules with Multi-Model Comparison
+    ml_prob, ml_contributions, model_comp, champ_id = MLEngine.predict_with_comparison(features)
     anomaly_score = AnomalyEngine.compute_anomaly_score(features)
     rule_score, rule_reasons, rule_contributions = RuleEngine.evaluate_rules(features)
 
@@ -88,9 +91,11 @@ async def process_transaction(payload: TransactionCreate, db: Session = Depends(
         reasons=reasons
     )
 
-    # Merge rule contributions into feature breakdown
+    # Merge rule contributions & multi-model comparison into feature breakdown
     feature_breakdown["rules_detail"] = rule_contributions
     feature_breakdown["ml_detail"] = ml_contributions
+    feature_breakdown["model_comparison"] = model_comp
+    feature_breakdown["champion_model"] = champ_id
 
     # 6. Save Transaction Record
     txn_id = f"TXN-{uuid.uuid4().hex[:10].upper()}"
@@ -197,6 +202,8 @@ async def process_transaction(payload: TransactionCreate, db: Session = Depends(
     txn_dict["device_id"] = txn.device_id
     txn_dict["rule_score"] = txn.rule_score
     txn_dict["velocity_score"] = txn.velocity_score
+    txn_dict["model_comparison"] = feature_breakdown.get("model_comparison")
+    txn_dict["active_champion_model"] = feature_breakdown.get("champion_model")
     return txn_dict
 
 @router.get("/live", response_model=List[TransactionResponse])
@@ -293,8 +300,12 @@ def pre_screen_p2p_transfer(payload: P2PTransferRequest, db: Session = Depends(g
     if sender_bal < payload.amount:
         raise HTTPException(status_code=400, detail=f"Insufficient balance. Available: {sender_bal:,.2f} {payload.currency}, Requested: {payload.amount:,.2f} {payload.currency}")
 
-    # Extract features for sender
-    now = datetime.datetime.utcnow()
+    # Extract features for sender with real GPS and temporal telemetry
+    now = payload.timestamp or datetime.datetime.utcnow()
+    if now.tzinfo is not None:
+        now = now.replace(tzinfo=None)
+    if now.tzinfo is not None:
+        now = now.replace(tzinfo=None)
     features = FeatureExtractor.extract_features(
         db=db,
         user_id=sender.id,
@@ -302,12 +313,12 @@ def pre_screen_p2p_transfer(payload: P2PTransferRequest, db: Session = Depends(g
         timestamp=now,
         device_id=payload.device_id or (sender.behavior_profile.known_devices[0] if sender.behavior_profile and sender.behavior_profile.known_devices else "dev_web_portal"),
         location_name=payload.location_name or sender.city or "Mumbai, IN",
-        latitude=payload.latitude or 19.0760,
-        longitude=payload.longitude or 72.8777,
+        latitude=payload.latitude if payload.latitude is not None else 19.0760,
+        longitude=payload.longitude if payload.longitude is not None else 72.8777,
         beneficiary_id=receiver.id
     )
 
-    ml_prob, ml_contributions = MLEngine.predict_fraud_probability(features)
+    ml_prob, ml_contributions, model_comp, champ_id = MLEngine.predict_with_comparison(features)
     anomaly_score = AnomalyEngine.compute_anomaly_score(features)
     rule_score, rule_reasons, rule_contributions = RuleEngine.evaluate_rules(features)
 
@@ -379,13 +390,13 @@ async def execute_p2p_transfer(payload: P2PTransferRequest, db: Session = Depend
     if sender_bal < payload.amount:
         raise HTTPException(status_code=400, detail=f"Insufficient balance. Available: {sender_bal:,.2f} {payload.currency}")
 
-    # Debit sender and Credit receiver
-    sender.balance = round(sender_bal - payload.amount, 2)
-    receiver.balance = round((receiver.balance or 0.0) + payload.amount, 2)
-
-    now = datetime.datetime.utcnow()
+    now = payload.timestamp or datetime.datetime.utcnow()
+    if now.tzinfo is not None:
+        now = now.replace(tzinfo=None)
     device_id = payload.device_id or (sender.behavior_profile.known_devices[0] if sender.behavior_profile and sender.behavior_profile.known_devices else "dev_p2p_portal")
     location_name = payload.location_name or sender.city or "Mumbai, IN"
+    lat = payload.latitude if payload.latitude is not None else (sender.behavior_profile.typical_lat or 19.0760)
+    lon = payload.longitude if payload.longitude is not None else (sender.behavior_profile.typical_lon or 72.8777)
 
     # Extract behavioral and contextual features
     features = FeatureExtractor.extract_features(
@@ -395,13 +406,13 @@ async def execute_p2p_transfer(payload: P2PTransferRequest, db: Session = Depend
         timestamp=now,
         device_id=device_id,
         location_name=location_name,
-        latitude=payload.latitude or 19.0760,
-        longitude=payload.longitude or 72.8777,
+        latitude=lat,
+        longitude=lon,
         beneficiary_id=receiver.id
     )
 
-    # ML & Rule Scoring
-    ml_prob, ml_contributions = MLEngine.predict_fraud_probability(features)
+    # ML & Rule Scoring with Multi-Model Comparison
+    ml_prob, ml_contributions, model_comp, champ_id = MLEngine.predict_with_comparison(features)
     anomaly_score = AnomalyEngine.compute_anomaly_score(features)
     rule_score, rule_reasons, rule_contributions = RuleEngine.evaluate_rules(features)
 
@@ -414,8 +425,20 @@ async def execute_p2p_transfer(payload: P2PTransferRequest, db: Session = Depend
         reasons=reasons
     )
 
+    # Settle balances ONLY if approved; if blocked/flagged, hold until user confirmation
+    if txn_status == "APPROVED":
+        sender.balance = round(sender_bal - payload.amount, 2)
+        receiver.balance = round((receiver.balance or 0.0) + payload.amount, 2)
+        p2p_settled = True
+    else:
+        sender.balance = sender_bal
+        p2p_settled = False
+
     feature_breakdown["rules_detail"] = rule_contributions
     feature_breakdown["ml_detail"] = ml_contributions
+    feature_breakdown["model_comparison"] = model_comp
+    feature_breakdown["champion_model"] = champ_id
+    feature_breakdown["p2p_settled"] = p2p_settled
     feature_breakdown["p2p_sender"] = {
         "id": sender.id,
         "name": sender.name,
@@ -426,7 +449,7 @@ async def execute_p2p_transfer(payload: P2PTransferRequest, db: Session = Depend
     feature_breakdown["p2p_receiver"] = {
         "id": receiver.id,
         "name": receiver.name,
-        "balance_before": round(receiver.balance - payload.amount, 2),
+        "balance_before": receiver.balance if not p2p_settled else round(receiver.balance - payload.amount, 2),
         "balance_after": receiver.balance,
         "city": receiver.city
     }
@@ -535,28 +558,74 @@ async def execute_p2p_transfer(payload: P2PTransferRequest, db: Session = Depend
     res["device_id"] = txn.device_id
     res["rule_score"] = txn.rule_score
     res["velocity_score"] = txn.velocity_score
+    res["model_comparison"] = feature_breakdown.get("model_comparison")
+    res["active_champion_model"] = feature_breakdown.get("champion_model")
     return res
 
+@router.post("/{txn_id}/confirm-genuine", response_model=TransactionResponse)
 @router.post("/{txn_id}/continue", response_model=TransactionResponse)
-async def continue_transaction(txn_id: str, db: Session = Depends(get_db)):
-    """Authorize and continue a held/flagged transaction after human/security confirmation."""
+async def confirm_genuine_transaction(txn_id: str, db: Session = Depends(get_db)):
+    """
+    Confirms and unblocks a blocked/flagged P2P or merchant transaction as genuine.
+    1. Verifies transaction belongs to user/sender.
+    2. Updates transaction status from BLOCKED / FLAGGED to APPROVED.
+    3. Updates sender and receiver balances in the database if not already settled.
+    4. Marks any linked alert in FraudAlert as RESOLVED_CONFIRMED_GENUINE.
+    5. Calls BehaviorTracker.update_profile(force_trust=True) to whitelist device/location in Fraud DNA.
+    6. Broadcasts TRANSACTION_UNBLOCKED and ALERT_RESOLVED to all WebSocket clients.
+    """
     txn = db.query(Transaction).filter(Transaction.id == txn_id).first()
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
     txn.status = "APPROVED"
+
+    # Settle balances for P2P if not already settled
+    breakdown = dict(txn.feature_breakdown or {})
+    if txn.transaction_type == "P2P_TRANSFER" and not breakdown.get("p2p_settled", False):
+        sender = db.query(User).filter(User.id == txn.user_id).first()
+        receiver_id = txn.beneficiary_user_id or txn.beneficiary_id
+        receiver = db.query(User).filter(User.id == receiver_id).first() if receiver_id else None
+        if sender and receiver:
+            sender.balance = round(max(0.0, (sender.balance or 0.0) - txn.amount), 2)
+            receiver.balance = round((receiver.balance or 0.0) + txn.amount, 2)
+            txn.sender_balance_after = sender.balance
+            txn.beneficiary_balance_after = receiver.balance
+            breakdown["p2p_settled"] = True
+            txn.feature_breakdown = breakdown
+
+    # Mark linked alert as RESOLVED_CONFIRMED_GENUINE
+    alert_data = None
     alert = db.query(FraudAlert).filter(FraudAlert.transaction_id == txn.id).first()
     if alert:
-        alert.status = "RESOLVED"
-        alert.analyst_notes = "User confirmed transaction through security authorization popup."
+        alert.status = "RESOLVED_CONFIRMED_GENUINE"
+        alert.analyst_notes = "User confirmed & verified transfer as genuine. Self-healing unblock executed."
         alert.updated_at = datetime.datetime.utcnow()
+        alert_data = {
+            "alert_id": alert.id,
+            "transaction_id": txn.id,
+            "status": alert.status
+        }
+
+    # Whitelist device and location into Fraud DNA so future similar transfers won't be blocked
+    BehaviorTracker.update_profile(db, txn.user_id, txn, force_trust=True)
 
     db.commit()
     db.refresh(txn)
 
     d = {c.name: getattr(txn, c.name) for c in txn.__table__.columns}
     d["is_live"] = (txn.timestamp >= datetime.datetime.utcnow() - datetime.timedelta(hours=24))
+    if "model_comparison" in breakdown:
+        d["model_comparison"] = breakdown["model_comparison"]
+    if "champion_model" in breakdown:
+        d["active_champion_model"] = breakdown["champion_model"]
+
+    # Real-Time Broadcasts
+    await broadcast_event("TRANSACTION_UNBLOCKED", d)
+    if alert_data:
+        await broadcast_event("ALERT_RESOLVED", alert_data)
     await broadcast_event("TRANSACTION_UPDATED", d)
+
     return d
 
 @router.post("/counterfactual", response_model=CounterfactualResponse)

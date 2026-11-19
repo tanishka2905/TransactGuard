@@ -32,6 +32,10 @@ class FeatureExtractor:
         beneficiary_id: str = None
     ) -> Dict[str, Any]:
         """Extract behavioral, contextual, and velocity features for real-time risk assessment."""
+        # Normalize timestamp to UTC naive for consistent SQLite comparisons
+        if timestamp and timestamp.tzinfo is not None:
+            timestamp = timestamp.replace(tzinfo=None)
+
         # 1. Fetch user profile
         profile = db.query(UserBehaviorProfile).filter(UserBehaviorProfile.user_id == user_id).first()
         

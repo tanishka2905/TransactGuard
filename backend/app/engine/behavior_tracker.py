@@ -4,10 +4,12 @@ from app.db.models import UserBehaviorProfile, Transaction
 
 class BehaviorTracker:
     @staticmethod
-    def update_profile(db: Session, user_id: str, txn: Transaction):
+    def update_profile(db: Session, user_id: str, txn: Transaction, force_trust: bool = False):
         """
         Dynamically updates the user's behavioral DNA profile based on new approved transaction.
         Tracks rolling averages, known devices, locations, and time patterns.
+        If force_trust is True (e.g., self-healing unblock confirmation), guarantees adding
+        device, location, and beneficiary to trusted envelope even if initial risk was CRITICAL.
         """
         profile = db.query(UserBehaviorProfile).filter(UserBehaviorProfile.user_id == user_id).first()
         if not profile:
@@ -33,9 +35,9 @@ class BehaviorTracker:
             db.commit()
             return profile
 
-        # Only update baselines for approved or low/medium risk transactions
-        if txn.risk_level in ["HIGH", "CRITICAL"]:
-            return profile # Do not poison baseline with fraudulent activity
+        # Only skip baseline updates if high/critical risk AND not force-trusted
+        if txn.risk_level in ["HIGH", "CRITICAL"] and not force_trust:
+            return profile # Do not poison baseline with unconfirmed fraudulent activity
 
         # Exponential moving average / incremental update
         alpha = 0.15 # Learning rate

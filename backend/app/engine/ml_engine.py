@@ -134,6 +134,40 @@ class MLEngine:
         return round(prob, 4), feature_contributions
 
     @classmethod
+    def predict_with_comparison(
+        cls, 
+        features: Dict[str, Any]
+    ) -> Tuple[float, Dict[str, float], Dict[str, Any], str]:
+        """
+        Runs multi-model inference across all registered candidate models,
+        designates the active Champion Model to drive the active ml_probability,
+        and returns a rich model_comparison object containing scores and verdicts
+        from every algorithm.
+        """
+        comparison_data = cls.predict_all_models(features)
+        champion_id = cls._active_champion_id
+
+        # Use champion model prediction for the primary probability
+        champ_pred = comparison_data["model_predictions"].get(champion_id)
+        if champ_pred and "probability" in champ_pred:
+            ml_prob = champ_pred["probability"]
+        else:
+            ml_prob, _ = cls.predict_fraud_probability(features, champion_id)
+
+        _, feature_contributions = cls.predict_fraud_probability(features, champion_id)
+
+        model_comparison = {
+            "champion_model": champion_id,
+            "champion_model_name": MODEL_FILES.get(champion_id, (None, False, champion_id))[2],
+            "models": comparison_data["model_predictions"],
+            "average_probability": comparison_data["average_probability"],
+            "model_variance": comparison_data["model_variance"],
+            "consensus_agreement": comparison_data["consensus_agreement"]
+        }
+
+        return round(ml_prob, 4), feature_contributions, model_comparison, champion_id
+
+    @classmethod
     def predict_all_models(cls, features: Dict[str, Any]) -> Dict[str, Any]:
         """
         Runs multi-model inference across ALL registered models in parallel

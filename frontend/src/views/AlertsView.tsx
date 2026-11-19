@@ -46,6 +46,45 @@ export const AlertsView: React.FC<AlertsViewProps> = ({
     fetchAlerts();
   }, [fetchAlerts]);
 
+  // FEATURE 3: Real-Time Alert Resolution Synchrony on Self-Healing Unblock
+  useEffect(() => {
+    const handleAlertResolved = (e: any) => {
+      const payload = e.detail;
+      const resolvedTxnId = payload?.transaction_id || payload?.id;
+      const resolvedAlertId = payload?.alert_id;
+
+      setAlerts((prev) => {
+        // If filtering by NEW or active alerts, filter it out immediately
+        if (statusFilter === 'NEW' || statusFilter === 'REVIEWING') {
+          return prev.filter(
+            (a) => a.id !== resolvedAlertId && a.transaction_id !== resolvedTxnId
+          );
+        }
+        // Otherwise, mark its status as RESOLVED
+        return prev.map((a) => {
+          if (a.id === resolvedAlertId || a.transaction_id === resolvedTxnId) {
+            return {
+              ...a,
+              status: 'RESOLVED' as AlertStatus,
+              analyst_notes: 'Self-healing resolved: User verified and confirmed as genuine.'
+            };
+          }
+          return a;
+        });
+      });
+
+      if (onAlertUpdated) onAlertUpdated();
+    };
+
+    window.addEventListener('alert_resolved', handleAlertResolved);
+    window.addEventListener('transaction_unblocked', handleAlertResolved);
+
+    return () => {
+      window.removeEventListener('alert_resolved', handleAlertResolved);
+      window.removeEventListener('transaction_unblocked', handleAlertResolved);
+    };
+  }, [statusFilter, onAlertUpdated]);
+
   const handleStatusChange = async (alertId: string, newStatus: AlertStatus) => {
     try {
       setUpdatingId(alertId);

@@ -1,6 +1,25 @@
 export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type TransactionStatus = 'APPROVED' | 'FLAGGED' | 'BLOCKED';
-export type AlertStatus = 'NEW' | 'REVIEWING' | 'RESOLVED' | 'FALSE_POSITIVE' | 'CONFIRMED_FRAUD';
+export type AlertStatus = 'NEW' | 'REVIEWING' | 'RESOLVED' | 'FALSE_POSITIVE' | 'CONFIRMED_FRAUD' | 'RESOLVED_CONFIRMED_GENUINE';
+
+export interface ModelPredictionItem {
+  name: string;
+  probability: number;
+  verdict: 'LEGITIMATE' | 'FRAUD' | string;
+  algorithm?: string;
+  latency_ms?: number;
+  is_champion?: boolean;
+  fraud_probability?: number;
+}
+
+export interface ModelComparisonData {
+  champion_model: string;
+  champion_model_name: string;
+  models: Record<string, ModelPredictionItem>;
+  average_probability: number;
+  model_variance?: number;
+  consensus_agreement: string;
+}
 
 export interface FeatureBreakdown {
   ml_contribution: number;
@@ -19,6 +38,7 @@ export interface FeatureBreakdown {
   ml_detail?: Record<string, number>;
   p2p_sender?: any;
   p2p_receiver?: any;
+  model_comparison?: ModelComparisonData;
 }
 
 export interface Transaction {
@@ -55,6 +75,8 @@ export interface Transaction {
   source: string;
   is_live: boolean;
   created_at?: string;
+  model_comparison?: ModelComparisonData;
+  active_champion_model?: string;
 }
 
 export interface FraudAlert {

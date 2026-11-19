@@ -16,6 +16,10 @@ async def trigger_scenario(
     user_id: str = None,
     custom_amount: float = None,
     currency: str = "TGX",
+    latitude: float = None,
+    longitude: float = None,
+    location_name: str = None,
+    timestamp: datetime.datetime = None,
     db: Session = Depends(get_db)
 ):
     """
@@ -52,7 +56,10 @@ async def trigger_scenario(
                 currency=currency,
                 payment_method="P2P_TRANSFER",
                 device_id=(sender.behavior_profile.known_devices[0] if sender.behavior_profile and sender.behavior_profile.known_devices else "dev_mobile"),
-                location_name=sender.city or "Mumbai, IN",
+                location_name=location_name or sender.city or "Mumbai, IN",
+                latitude=latitude,
+                longitude=longitude,
+                timestamp=timestamp,
                 note=f"P2P settlement: {sender.name} to {receiver.name}"
             )
             return await execute_p2p_transfer(req, db)
@@ -93,9 +100,10 @@ async def trigger_scenario(
             merchant_category="Food & Beverage",
             device_id=known_device,
             ip_address="103.21.124.50",
-            location_name=known_loc,
-            latitude=typical_lat,
-            longitude=typical_lon,
+            location_name=location_name or known_loc,
+            latitude=latitude if latitude is not None else typical_lat,
+            longitude=longitude if longitude is not None else typical_lon,
+            timestamp=timestamp,
             transaction_type="PURCHASE",
             source="SIMULATOR"
         )

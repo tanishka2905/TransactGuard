@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -48,6 +48,35 @@ class TransactionResponse(TransactionBase):
     feature_breakdown: Dict[str, Any]
     is_live: bool = False
     created_at: datetime
+    model_comparison: Optional[Dict[str, Any]] = None
+    active_champion_model: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_model_comparison(cls, data: Any) -> Any:
+        if hasattr(data, "feature_breakdown") and data.feature_breakdown:
+            fb = data.feature_breakdown
+            if isinstance(fb, dict):
+                comp = fb.get("model_comparison")
+                champ = fb.get("champion_model")
+                if comp and not getattr(data, "model_comparison", None):
+                    try:
+                        setattr(data, "model_comparison", comp)
+                    except Exception:
+                        pass
+                if champ and not getattr(data, "active_champion_model", None):
+                    try:
+                        setattr(data, "active_champion_model", champ)
+                    except Exception:
+                        pass
+        elif isinstance(data, dict):
+            fb = data.get("feature_breakdown") or {}
+            if isinstance(fb, dict):
+                if "model_comparison" in fb and "model_comparison" not in data:
+                    data["model_comparison"] = fb["model_comparison"]
+                if "champion_model" in fb and "active_champion_model" not in data:
+                    data["active_champion_model"] = fb["champion_model"]
+        return data
 
     class Config:
         from_attributes = True
@@ -183,6 +212,7 @@ class P2PTransferRequest(BaseModel):
     location_name: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    timestamp: Optional[datetime] = None
     note: Optional[str] = "P2P instant credit transfer"
 
 class P2PPreScreenResponse(BaseModel):

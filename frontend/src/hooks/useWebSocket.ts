@@ -2,14 +2,16 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { Transaction, FraudAlert } from '../types';
 
 interface WebSocketMessage {
-  event: 'CONNECTED' | 'PONG' | 'NEW_TRANSACTION' | 'NEW_ALERT';
+  event: 'CONNECTED' | 'PONG' | 'NEW_TRANSACTION' | 'NEW_ALERT' | 'TRANSACTION_UNBLOCKED' | 'ALERT_RESOLVED' | 'TRANSACTION_UPDATED';
   data?: any;
   message?: string;
 }
 
 export function useWebSocket(
   onNewTransaction?: (txn: Transaction) => void,
-  onNewAlert?: (alert: FraudAlert) => void
+  onNewAlert?: (alert: FraudAlert) => void,
+  onTransactionUnblocked?: (data: any) => void,
+  onAlertResolved?: (data: any) => void
 ) {
   const [isConnected, setIsConnected] = useState(false);
   const [lastHeartbeat, setLastHeartbeat] = useState<Date | null>(null);
@@ -35,6 +37,14 @@ export function useWebSocket(
             onNewTransaction(payload.data);
           } else if (payload.event === 'NEW_ALERT' && payload.data && onNewAlert) {
             onNewAlert(payload.data);
+          } else if (payload.event === 'TRANSACTION_UNBLOCKED') {
+            if (onTransactionUnblocked && payload.data) onTransactionUnblocked(payload.data);
+            window.dispatchEvent(new CustomEvent('transaction_unblocked', { detail: payload.data }));
+          } else if (payload.event === 'ALERT_RESOLVED') {
+            if (onAlertResolved && payload.data) onAlertResolved(payload.data);
+            window.dispatchEvent(new CustomEvent('alert_resolved', { detail: payload.data }));
+          } else if (payload.event === 'TRANSACTION_UPDATED') {
+            window.dispatchEvent(new CustomEvent('transaction_updated', { detail: payload.data }));
           }
         } catch (e) {
           console.error('[WebSocket] Message parse error:', e);

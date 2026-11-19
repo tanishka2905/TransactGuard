@@ -61,6 +61,18 @@ export const api = {
     return res.json();
   },
 
+  async confirmGenuine(txnId: string): Promise<Transaction> {
+    const res = await fetch(`${API_BASE}/transactions/${txnId}/confirm-genuine`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Failed to confirm transaction' }));
+      throw new Error(err.detail || 'Failed to confirm and unblock transaction');
+    }
+    return res.json();
+  },
+
   async preScreenP2PTransfer(payload: {
     sender_id: string;
     receiver_id: string;
@@ -68,6 +80,11 @@ export const api = {
     currency?: string;
     payment_method?: string;
     note?: string;
+    latitude?: number;
+    longitude?: number;
+    location_name?: string;
+    device_id?: string;
+    timestamp?: string;
   }): Promise<P2PPreScreenResult> {
     const cleanPayload = {
       sender_id: String(payload.sender_id || ''),
@@ -75,7 +92,12 @@ export const api = {
       amount: Number(payload.amount || 0),
       currency: String(payload.currency || 'TGX'),
       payment_method: String(payload.payment_method || 'P2P_TRANSFER'),
-      note: String(payload.note || '')
+      note: String(payload.note || ''),
+      latitude: payload.latitude,
+      longitude: payload.longitude,
+      location_name: payload.location_name,
+      device_id: payload.device_id,
+      timestamp: payload.timestamp
     };
     const res = await fetch(`${API_BASE}/transactions/p2p/pre-screen`, {
       method: 'POST',
@@ -96,6 +118,11 @@ export const api = {
     currency?: string;
     payment_method?: string;
     note?: string;
+    latitude?: number;
+    longitude?: number;
+    location_name?: string;
+    device_id?: string;
+    timestamp?: string;
   }): Promise<Transaction> {
     const cleanPayload = {
       sender_id: String(payload.sender_id || ''),
@@ -103,7 +130,12 @@ export const api = {
       amount: Number(payload.amount || 0),
       currency: String(payload.currency || 'TGX'),
       payment_method: String(payload.payment_method || 'P2P_TRANSFER'),
-      note: String(payload.note || '')
+      note: String(payload.note || ''),
+      latitude: payload.latitude,
+      longitude: payload.longitude,
+      location_name: payload.location_name,
+      device_id: payload.device_id,
+      timestamp: payload.timestamp
     };
     const res = await fetch(`${API_BASE}/transactions/p2p`, {
       method: 'POST',
@@ -187,12 +219,20 @@ export const api = {
     scenario: string, 
     userId?: string, 
     customAmount?: number,
-    currency?: string
+    currency?: string,
+    latitude?: number,
+    longitude?: number,
+    location_name?: string,
+    timestamp?: string
   ): Promise<Transaction> {
     const q = new URLSearchParams({ scenario });
     if (userId) q.append('user_id', userId);
     if (customAmount) q.append('custom_amount', String(customAmount));
     if (currency) q.append('currency', currency);
+    if (latitude !== undefined) q.append('latitude', String(latitude));
+    if (longitude !== undefined) q.append('longitude', String(longitude));
+    if (location_name) q.append('location_name', location_name);
+    if (timestamp) q.append('timestamp', timestamp);
 
     const res = await fetch(`${API_BASE}/simulator/scenarios?${q.toString()}`, {
       method: 'POST'
