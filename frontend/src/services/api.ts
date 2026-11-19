@@ -4,7 +4,11 @@ import type {
   FraudAlert, 
   UserBehaviorProfile, 
   UserSummary,
-  P2PPreScreenResult 
+  P2PPreScreenResult,
+  ModelRegistryResponse,
+  CounterfactualRequest,
+  CounterfactualResponse,
+  GraphNetworkResponse
 } from '../types';
 
 const API_BASE = 'http://localhost:8000/api/v1';
@@ -194,6 +198,77 @@ export const api = {
       method: 'POST'
     });
     if (!res.ok) throw new Error('Failed to trigger simulator scenario');
+    return res.json();
+  },
+
+  async getModelRegistry(): Promise<ModelRegistryResponse> {
+    const res = await fetch(`${API_BASE}/models/registry`);
+    if (!res.ok) throw new Error('Failed to fetch model registry');
+    return res.json();
+  },
+
+  async selectChampionModel(model_id: string): Promise<{
+    status: string;
+    message: string;
+    champion_model_id: string;
+    champion_model_name: string;
+  }> {
+    const res = await fetch(`${API_BASE}/models/select-champion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model_id })
+    });
+    if (!res.ok) throw new Error('Failed to switch champion model');
+    return res.json();
+  },
+
+  async compareModelInferences(features: Record<string, any>): Promise<any> {
+    const res = await fetch(`${API_BASE}/models/compare-inference`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(features)
+    });
+    if (!res.ok) throw new Error('Failed to compare model inferences');
+    return res.json();
+  },
+
+  async triggerPipelineRetrain(): Promise<any> {
+    const res = await fetch(`${API_BASE}/models/retrain`, {
+      method: 'POST'
+    });
+    if (!res.ok) throw new Error('Failed to trigger pipeline retraining');
+    return res.json();
+  },
+
+  async simulateCounterfactual(payload: CounterfactualRequest): Promise<CounterfactualResponse> {
+    const res = await fetch(`${API_BASE}/transactions/counterfactual`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('Failed to execute counterfactual simulation');
+    return res.json();
+  },
+
+  async verifyStepUpChallenge(txnId: string, challengeType = 'OTP_VERIFICATION'): Promise<Transaction> {
+    const res = await fetch(`${API_BASE}/transactions/${txnId}/verify-challenge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challenge_type: challengeType, verification_code: '123456' })
+    });
+    if (!res.ok) throw new Error('Failed to verify step-up challenge');
+    return res.json();
+  },
+
+  async getTransactionGraph(limit = 150): Promise<GraphNetworkResponse> {
+    const res = await fetch(`${API_BASE}/graph/network?limit=${limit}`);
+    if (!res.ok) throw new Error('Failed to fetch transaction graph');
+    return res.json();
+  },
+
+  async getUserMuleAnalysis(userId: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/graph/mule-analysis/${userId}`);
+    if (!res.ok) throw new Error('Failed to fetch user mule analysis');
     return res.json();
   }
 };

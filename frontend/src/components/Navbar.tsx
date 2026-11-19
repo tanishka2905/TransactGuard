@@ -11,7 +11,8 @@ import {
   Dices, 
   Send,
   ChevronDown,
-  Globe
+  Globe,
+  Share2
 } from 'lucide-react';
 import { 
   getStoredCurrency, 
@@ -21,7 +22,7 @@ import {
 } from '../utils/currency';
 import type { CurrencyConfig } from '../types';
 
-export type TabType = 'landing' | 'dashboard' | 'live' | 'history' | 'alerts' | 'dna' | 'model' | 'users';
+export type TabType = 'landing' | 'dashboard' | 'live' | 'graph' | 'users' | 'history' | 'alerts' | 'dna' | 'model';
 
 interface NavbarProps {
   activeTab: TabType;
@@ -66,6 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'landing' as TabType, label: 'Platform', icon: Globe },
     { id: 'dashboard' as TabType, label: 'Command Center', icon: Activity },
     { id: 'live' as TabType, label: 'Live Stream (<24h)', icon: Radio },
+    { id: 'graph' as TabType, label: 'Graph Intelligence', icon: Share2 },
     { id: 'users' as TabType, label: 'Multi-User P2P', icon: Users },
     { id: 'history' as TabType, label: 'Audit History', icon: History },
     { id: 'alerts' as TabType, label: 'Fraud Alerts', icon: Bell, badge: alertCount },

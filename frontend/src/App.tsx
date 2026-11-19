@@ -17,6 +17,7 @@ import { BehavioralDNAView } from './views/BehavioralDNAView';
 import { ModelTelemetryView } from './views/ModelTelemetryView';
 import { MultiUserView } from './views/MultiUserView';
 import { LandingPageView } from './views/LandingPageView';
+import { GraphIntelligenceView } from './views/GraphIntelligenceView';
 import type { Transaction, DashboardMetrics } from './types';
 import { api } from './services/api';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -202,6 +203,10 @@ export function App() {
             isConnected={isConnected}
             onOpenTransfer={() => handleOpenTransfer()}
           />
+        )}
+
+        {activeTab === 'graph' && (
+          <GraphIntelligenceView />
         )}
 
         {activeTab === 'users' && (

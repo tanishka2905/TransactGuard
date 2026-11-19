@@ -170,3 +170,116 @@ export interface CurrencyConfig {
   name: string;
   rateToInr: number;
 }
+
+export interface ModelBenchmark {
+  model_id: string;
+  name: string;
+  category: string;
+  accuracy: number;
+  precision: number;
+  recall: number;
+  f1_score: number;
+  roc_auc: number;
+  pr_auc: number;
+  confusion_matrix: {
+    true_negative: number;
+    false_positive: number;
+    false_negative: number;
+    true_positive: number;
+  };
+  latency_ms: number;
+  training_time_s: number;
+  file: string;
+  requires_scaling: boolean;
+}
+
+export interface ModelRegistryResponse {
+  version: string;
+  champion_model_id: string;
+  champion_model_name: string;
+  active_models_count: number;
+  dataset: {
+    total_samples: number;
+    train_samples: number;
+    test_samples: number;
+    fraud_rate_pct: number;
+    features_count: number;
+  };
+  leaderboard: ModelBenchmark[];
+  feature_importances: Record<string, number>;
+  feature_columns: string[];
+  last_trained_timestamp?: string;
+}
+
+export interface CounterfactualRequest {
+  transaction_id?: string;
+  user_id?: string;
+  amount?: number;
+  speed_kmh?: number;
+  is_new_device?: number;
+  is_night?: number;
+  is_new_beneficiary?: number;
+  velocity_5m?: number;
+  model_id?: string;
+}
+
+export interface CounterfactualResponse {
+  original_risk_score: number;
+  original_risk_level: string;
+  original_status: string;
+  counterfactual_risk_score: number;
+  counterfactual_risk_level: string;
+  counterfactual_status: string;
+  score_delta: number;
+  decision_flipped: boolean;
+  active_model_used: string;
+  counterfactual_reasons: string[];
+  feature_breakdown: Record<string, any>;
+}
+
+export interface GraphNode {
+  id: string;
+  label: string;
+  balance: number;
+  city: string;
+  in_degree: number;
+  out_degree: number;
+  total_inflow: number;
+  total_outflow: number;
+  mule_risk_score: number;
+  syndicate_flags: string[];
+  is_suspicious: boolean;
+}
+
+export interface GraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  amount: number;
+  timestamp: string;
+  status: string;
+  is_flagged: boolean;
+}
+
+export interface GraphNetworkResponse {
+  summary: {
+    total_nodes: number;
+    total_edges: number;
+    detected_cycles_count: number;
+    shared_device_clusters_count: number;
+    high_risk_mules_count: number;
+  };
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  detected_cycles: string[][];
+  shared_device_clusters: {
+    device_id: string;
+    user_ids: string[];
+  }[];
+  mule_hotspots: {
+    user_id: string;
+    name: string;
+    mule_risk_score: number;
+    flags: string[];
+  }[];
+}

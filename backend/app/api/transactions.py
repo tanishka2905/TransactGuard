@@ -12,7 +12,10 @@ from app.schemas.transaction import (
     TransactionResponse, 
     AlertResponse,
     P2PTransferRequest,
-    P2PPreScreenResponse
+    P2PPreScreenResponse,
+    CounterfactualRequest,
+    CounterfactualResponse,
+    VerifyChallengeRequest
 )
 from app.engine.feature_extractor import FeatureExtractor
 from app.engine.ml_engine import MLEngine
@@ -546,6 +549,140 @@ async def continue_transaction(txn_id: str, db: Session = Depends(get_db)):
     if alert:
         alert.status = "RESOLVED"
         alert.analyst_notes = "User confirmed transaction through security authorization popup."
+        alert.updated_at = datetime.datetime.utcnow()
+
+    db.commit()
+    db.refresh(txn)
+
+    d = {c.name: getattr(txn, c.name) for c in txn.__table__.columns}
+    d["is_live"] = (txn.timestamp >= datetime.datetime.utcnow() - datetime.timedelta(hours=24))
+    await broadcast_event("TRANSACTION_UPDATED", d)
+    return d
+
+@router.post("/counterfactual", response_model=CounterfactualResponse)
+def simulate_counterfactual(payload: CounterfactualRequest, db: Session = Depends(get_db)):
+    """
+    Explainable AI Counterfactual & What-If Sensitivity Engine.
+    Simulates what would happen to the risk score and final disposition
+    if specific parameters (amount, speed, device, timing, model) were altered.
+    """
+    base_features = {}
+    orig_score = 0.0
+    orig_level = "LOW"
+    orig_status = "APPROVED"
+
+    if payload.transaction_id:
+        txn = db.query(Transaction).filter(Transaction.id == payload.transaction_id).first()
+        if txn:
+            orig_score = txn.risk_score
+            orig_level = txn.risk_level
+            orig_status = txn.status
+            base_features = FeatureExtractor.extract_features(
+                db=db,
+                user_id=txn.user_id,
+                amount=txn.amount,
+                timestamp=txn.timestamp,
+                device_id=txn.device_id,
+                location_name=txn.location_name or "Mumbai, IN",
+                latitude=txn.latitude,
+                longitude=txn.longitude,
+                beneficiary_id=txn.beneficiary_id
+            )
+
+    if not base_features:
+        uid = payload.user_id or "usr_rahul_sharma"
+        base_features = FeatureExtractor.extract_features(
+            db=db,
+            user_id=uid,
+            amount=payload.amount or 5000.0,
+            timestamp=datetime.datetime.utcnow(),
+            device_id="dev_apple_iphone15_pro",
+            location_name="Mumbai, IN",
+            latitude=19.076,
+            longitude=72.8777
+        )
+        orig_score = 25.0
+
+    # Apply Counterfactual Overrides
+    cf_features = dict(base_features)
+    if payload.amount is not None:
+        cf_features["amount"] = float(payload.amount)
+        user_avg = cf_features.get("user_avg_amount", 2000.0) or 2000.0
+        cf_features["amount_ratio"] = round(payload.amount / max(1.0, user_avg), 2)
+        user_std = cf_features.get("user_std_amount", 500.0) or 500.0
+        cf_features["z_score"] = round((payload.amount - user_avg) / max(1.0, user_std), 2)
+
+    if payload.speed_kmh is not None:
+        cf_features["speed_kmh"] = float(payload.speed_kmh)
+    if payload.is_new_device is not None:
+        cf_features["is_new_device"] = int(payload.is_new_device)
+    if payload.is_night is not None:
+        cf_features["is_night"] = int(payload.is_night)
+        if payload.is_night:
+            cf_features["hour"] = 3
+            cf_features["is_preferred_hour"] = 0
+        else:
+            cf_features["hour"] = 14
+            cf_features["is_preferred_hour"] = 1
+    if payload.is_new_beneficiary is not None:
+        cf_features["is_new_beneficiary"] = int(payload.is_new_beneficiary)
+    if payload.velocity_5m is not None:
+        cf_features["velocity_5m"] = int(payload.velocity_5m)
+
+    # Score with target model or active champion
+    target_model = payload.model_id or MLEngine.get_active_model_id()
+    cf_ml_prob, ml_contributions = MLEngine.predict_fraud_probability(cf_features, model_id=target_model)
+    cf_anomaly_score = AnomalyEngine.compute_anomaly_score(cf_features)
+    cf_rule_score, cf_rule_reasons, cf_rule_contributions = RuleEngine.evaluate_rules(cf_features)
+
+    reasons = list(cf_rule_reasons)
+    cf_score, cf_level, cf_status, cf_velocity, breakdown = RiskCalculator.calculate_unified_risk(
+        ml_prob=cf_ml_prob,
+        anomaly_score=cf_anomaly_score,
+        rule_score=cf_rule_score,
+        features=cf_features,
+        reasons=reasons,
+        model_name=target_model
+    )
+    breakdown["rules_detail"] = cf_rule_contributions
+    breakdown["ml_detail"] = ml_contributions
+
+    score_delta = round(cf_score - orig_score, 1)
+    decision_flipped = (orig_status != cf_status)
+
+    return CounterfactualResponse(
+        original_risk_score=orig_score,
+        original_risk_level=orig_level,
+        original_status=orig_status,
+        counterfactual_risk_score=cf_score,
+        counterfactual_risk_level=cf_level,
+        counterfactual_status=cf_status,
+        score_delta=score_delta,
+        decision_flipped=decision_flipped,
+        active_model_used=target_model,
+        counterfactual_reasons=reasons,
+        feature_breakdown=breakdown
+    )
+
+@router.post("/{txn_id}/verify-challenge", response_model=TransactionResponse)
+async def verify_step_up_challenge(txn_id: str, payload: VerifyChallengeRequest, db: Session = Depends(get_db)):
+    """
+    Satisfies adaptive friction (OTP or Biometric challenge)
+    for a transaction in STEP_UP_REQUIRED status.
+    """
+    txn = db.query(Transaction).filter(Transaction.id == txn_id).first()
+    if not txn:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    txn.status = "APPROVED"
+    reasons = list(txn.reasons or [])
+    reasons.append(f"Adaptive Step-Up verified via {payload.challenge_type}.")
+    txn.reasons = reasons
+
+    alert = db.query(FraudAlert).filter(FraudAlert.transaction_id == txn.id).first()
+    if alert:
+        alert.status = "RESOLVED"
+        alert.analyst_notes = f"Challenge verified ({payload.challenge_type}). Transaction cleared."
         alert.updated_at = datetime.datetime.utcnow()
 
     db.commit()

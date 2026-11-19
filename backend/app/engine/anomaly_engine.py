@@ -5,37 +5,66 @@ from typing import Dict, Any
 
 MODEL_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "models_store")
 IFOREST_PATH = os.path.join(MODEL_DIR, "isolation_forest.joblib")
+ELLIPTIC_PATH = os.path.join(MODEL_DIR, "elliptic_envelope.joblib")
 
 class AnomalyEngine:
-    _model = None
+    _iforest = None
+    _elliptic = None
 
     @classmethod
-    def load_model(cls):
-        if cls._model is None and os.path.exists(IFOREST_PATH):
+    def load_iforest(cls):
+        if cls._iforest is None and os.path.exists(IFOREST_PATH):
             try:
-                cls._model = joblib.load(IFOREST_PATH)
+                cls._iforest = joblib.load(IFOREST_PATH)
             except Exception as e:
-                print(f"[AnomalyEngine] Warning: Could not load {IFOREST_PATH}: {e}")
-        return cls._model
+                print(f"[AnomalyEngine] Warning loading IF: {e}")
+        return cls._iforest
+
+    @classmethod
+    def load_elliptic(cls):
+        if cls._elliptic is None and os.path.exists(ELLIPTIC_PATH):
+            try:
+                cls._elliptic = joblib.load(ELLIPTIC_PATH)
+            except Exception as e:
+                print(f"[AnomalyEngine] Warning loading Elliptic: {e}")
+        return cls._elliptic
 
     @classmethod
     def compute_anomaly_score(cls, features: Dict[str, Any]) -> float:
         """
-        Unsupervised outlier score (0.0 to 100.0).
-        Evaluates behavioral distance from typical legitimate transactions.
+        Synthesizes Isolation Forest and Elliptic Envelope (Mahalanobis distance)
+        into a unified unsupervised anomaly score (0.0 to 100.0).
         """
-        model = cls.load_model()
-        if model is not None:
+        from app.engine.ml_engine import FEATURE_COLUMNS
+        vec = np.array([[float(features.get(col, 0.0)) for col in FEATURE_COLUMNS]])
+
+        scores = []
+
+        # 1. Isolation Forest score
+        iforest = cls.load_iforest()
+        if iforest is not None:
             try:
-                from app.engine.ml_engine import FEATURE_COLUMNS
-                vec = np.array([[float(features.get(col, 0.0)) for col in FEATURE_COLUMNS]])
-                # score_samples returns opposite of anomaly score (lower is more anomalous)
-                raw_score = model.score_samples(vec)[0]
-                # Normalize typical range [-0.7, -0.3] to [100, 0]
-                normalized = max(0.0, min(100.0, (-raw_score - 0.35) * 200.0))
-                return round(normalized, 1)
+                raw_score = iforest.score_samples(vec)[0]
+                # Lower is more anomalous; normalize [-0.7, -0.3] to [100, 0]
+                norm_if = max(0.0, min(100.0, (-raw_score - 0.35) * 200.0))
+                scores.append(norm_if)
             except Exception:
                 pass
+
+        # 2. Elliptic Envelope (Mahalanobis Distance) score
+        elliptic = cls.load_elliptic()
+        if elliptic is not None:
+            try:
+                # Mahalanobis distances
+                mahal_dist = elliptic.mahalanobis(vec)[0]
+                # Chi-squared degrees of freedom ~ 14. High mahal_dist (> 30) = extreme outlier
+                norm_mahal = max(0.0, min(100.0, (mahal_dist / 35.0) * 100.0))
+                scores.append(norm_mahal)
+            except Exception:
+                pass
+
+        if scores:
+            return round(float(np.mean(scores)), 1)
 
         # Fallback anomaly heuristic based on multivariate deviation
         z_score = abs(features.get("z_score", 0.0))

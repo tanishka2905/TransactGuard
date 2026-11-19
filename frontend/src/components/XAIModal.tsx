@@ -8,9 +8,14 @@ import {
   Smartphone, 
   Users, 
   Loader2, 
-  Check 
+  Check, 
+  Sliders, 
+  Play, 
+  ArrowRight,
+  ShieldCheck,
+  Fingerprint
 } from 'lucide-react';
-import type { Transaction } from '../types';
+import type { Transaction, CounterfactualResponse } from '../types';
 import { SideBySideTxnView } from './SideBySideTxnView';
 import { formatCurrencyAmount } from '../utils/currency';
 import { api } from '../services/api';
@@ -25,6 +30,19 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
   const [isContinuing, setIsContinuing] = useState(false);
   const [showContinueConfirm, setShowContinueConfirm] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  // Counterfactual Simulator State
+  const [showCounterfactual, setShowCounterfactual] = useState(false);
+  const [cfAmount, setCfAmount] = useState<number>(transaction ? transaction.amount : 5000);
+  const [cfSpeed, setCfSpeed] = useState<number>(transaction?.feature_breakdown?.speed_kmh || 0);
+  const [cfNewDevice, setCfNewDevice] = useState<number>(transaction?.feature_breakdown?.is_new_device ? 1 : 0);
+  const [cfNight, setCfNight] = useState<number>(transaction?.feature_breakdown?.is_night ? 1 : 0);
+  const [cfModel, setCfModel] = useState<string>('consensus_ensemble');
+  const [cfResult, setCfResult] = useState<CounterfactualResponse | null>(null);
+  const [cfLoading, setCfLoading] = useState(false);
+
+  // Step-up verification state
+  const [verifyingChallenge, setVerifyingChallenge] = useState(false);
 
   if (!transaction) return null;
 
@@ -59,134 +77,152 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
     try {
       setIsContinuing(true);
       await api.continueTransaction(transaction.id);
-      if (onUpdateStatus) {
-        onUpdateStatus(transaction.id, 'APPROVED');
-      }
-      setStatusMessage('Transaction successfully continued and approved!');
-      setShowContinueConfirm(false);
+      if (onUpdateStatus) onUpdateStatus(transaction.id, 'APPROVED');
+      setStatusMessage('Transaction authorized & cleared by analyst.');
       setTimeout(() => {
         onClose();
-      }, 1200);
+      }, 1500);
     } catch (err: any) {
-      alert(err.message || 'Failed to continue transaction');
+      alert(`Failed to continue transaction: ${err.message}`);
     } finally {
       setIsContinuing(false);
+      setShowContinueConfirm(false);
+    }
+  };
+
+  const handleVerifyStepUp = async (challengeType: string) => {
+    try {
+      setVerifyingChallenge(true);
+      await api.verifyStepUpChallenge(transaction.id, challengeType);
+      if (onUpdateStatus) onUpdateStatus(transaction.id, 'APPROVED');
+      setStatusMessage(`Adaptive challenge (${challengeType}) verified! Transaction approved.`);
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+    } catch (err: any) {
+      alert(`Challenge verification failed: ${err.message}`);
+    } finally {
+      setVerifyingChallenge(false);
+    }
+  };
+
+  const runCounterfactualSimulation = async () => {
+    try {
+      setCfLoading(true);
+      const res = await api.simulateCounterfactual({
+        transaction_id: transaction.id,
+        user_id: transaction.user_id,
+        amount: cfAmount,
+        speed_kmh: cfSpeed,
+        is_new_device: cfNewDevice,
+        is_night: cfNight,
+        model_id: cfModel
+      });
+      setCfResult(res);
+    } catch (err: any) {
+      alert(`Counterfactual error: ${err.message}`);
+    } finally {
+      setCfLoading(false);
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-      <div className="relative w-full max-w-5xl max-h-[92vh] overflow-y-auto glass-card rounded-2xl border border-white/[0.12] p-6 shadow-2xl space-y-5">
-        {/* Header */}
-        <div className="flex items-start justify-between pb-4 border-b border-white/[0.08]">
+      <div className="relative w-full max-w-4xl max-h-[92vh] overflow-y-auto rounded-3xl glass-panel border border-white/[0.1] bg-zinc-950/95 p-6 shadow-2xl space-y-6 text-zinc-100">
+        
+        {/* Modal Header */}
+        <div className="flex items-start justify-between border-b border-white/[0.08] pb-4">
           <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl border ${colors.bg} ${colors.border}`}>
+            <div className={`p-2.5 rounded-xl border ${colors.bg} ${colors.border} ${colors.glow}`}>
               <ShieldAlert className={`w-6 h-6 ${colors.text}`} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold text-white font-mono tracking-tight">
+                <span className="font-mono text-xs font-semibold text-zinc-400">
                   {transaction.id}
-                </h2>
-                <span
-                  className={`px-2.5 py-0.5 rounded-md text-xs font-mono font-semibold border ${colors.text} ${colors.bg} ${colors.border} ${colors.glow}`}
-                >
+                </span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider ${colors.bg} ${colors.text} border ${colors.border}`}>
                   {transaction.risk_level} RISK · {transaction.risk_score} / 100
                 </span>
-                <span className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${
-                  transaction.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                  transaction.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-300' :
+                  transaction.status === 'BLOCKED' ? 'bg-rose-500/20 text-rose-300' : 'bg-amber-500/20 text-amber-300'
                 }`}>
                   {transaction.status}
                 </span>
                 {isTwoUserTxn && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center gap-1">
+                    <Users className="w-3 h-3" />
                     2-User P2P Settlement
                   </span>
                 )}
               </div>
-              <p className="text-xs text-zinc-400 font-mono mt-0.5">
+              <p className="text-xs text-zinc-400 font-mono mt-1">
                 Timestamp: {new Date(transaction.timestamp).toLocaleString()} · Channel: {transaction.payment_method}
               </p>
             </div>
           </div>
+
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition-colors"
+            className="p-1.5 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Status Notification */}
+        {/* Status Toast Banner */}
         {statusMessage && (
-          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-mono text-xs flex items-center gap-2">
+          <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-xs font-mono flex items-center gap-2 animate-fadeIn">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             <span>{statusMessage}</span>
           </div>
         )}
 
-        {/* POPUP CONFIRMATION TO CONTINUE TRANSACTION (IF TRIGGERED) */}
+        {/* Confirmation Sub-Modal */}
         {showContinueConfirm && (
-          <div className="p-4 rounded-xl border border-indigo-500/40 bg-indigo-950/70 shadow-2xl animate-scaleUp">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h4 className="text-xs font-mono font-bold text-white flex items-center gap-2">
-                  <span>Security Authorization Check</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/30 text-indigo-200">
-                    Prompt
-                  </span>
-                </h4>
-                <p className="text-xs text-zinc-300 mt-1 font-mono">
-                  Are you sure you want to <strong>continue and execute</strong> this transaction of{' '}
-                  <span className="text-white font-bold">{formatCurrencyAmount(transaction.amount, { code: transaction.currency })}</span>?
-                  This will resolve active alerts and finalize the settlement between the user accounts.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => setShowContinueConfirm(false)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-mono text-zinc-400 hover:text-white bg-zinc-900 border border-white/[0.08]"
-                >
-                  Cancel
-                </button>
-                <button
-                  disabled={isContinuing}
-                  onClick={handleContinueAndApprove}
-                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-mono font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-600/30"
-                >
-                  {isContinuing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  <span>Continue Transaction</span>
-                </button>
-              </div>
+          <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/40 animate-fadeIn space-y-3 font-mono text-xs">
+            <div className="flex items-center gap-2 text-indigo-300 font-bold text-sm">
+              <ShieldAlert className="w-4 h-4 text-indigo-400" />
+              <span>Confirm Manual Authorization & Continue Transaction</span>
+            </div>
+            <p className="text-zinc-300 text-xs font-sans">
+              You are overriding the automated security verdict. This will immediately update the status to <strong>APPROVED</strong> and clear active security alerts.
+            </p>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={handleContinueAndApprove}
+                disabled={isContinuing}
+                className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-colors flex items-center gap-1.5"
+              >
+                {isContinuing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                <span>Authorize & Continue</span>
+              </button>
+              <button
+                onClick={() => setShowContinueConfirm(false)}
+                className="px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         )}
 
-        {/* SIDE-BY-SIDE DUAL-USER SECTION (When 2 Users are Involved) */}
+        {/* SIDE-BY-SIDE DUAL-USER LEDGER VIEW */}
         {isTwoUserTxn && (
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono uppercase tracking-wider text-indigo-300 flex items-center gap-1.5 font-bold">
-                <Users className="w-3.5 h-3.5" />
-                Side-by-Side Dual User Ledger
-              </span>
-              <span className="text-[10px] font-mono text-zinc-400">
-                Debited Sender ➔ Credited Beneficiary
-              </span>
-            </div>
+          <div className="space-y-2">
             <SideBySideTxnView transaction={transaction} />
           </div>
         )}
 
-        {/* Unified Risk Score Visual Gauge */}
-        <div className="p-4 rounded-xl bg-zinc-950/80 border border-white/[0.06]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider font-mono">
+        {/* Unified Risk Score Breakdown Gauge */}
+        <div className="p-4 rounded-xl bg-zinc-900/60 border border-white/[0.06]">
+          <div className="flex justify-between items-center text-xs font-mono mb-2">
+            <span className="text-zinc-300 uppercase tracking-wider font-semibold">
               Unified Risk Engine Composition
             </span>
-            <span className="text-xs font-mono text-zinc-300">
-              Normalized Score: <strong className={colors.text}>{transaction.risk_score}</strong> / 100
+            <span className={`font-bold ${colors.text}`}>
+              Normalized Score: {transaction.risk_score} / 100
             </span>
           </div>
 
@@ -276,6 +312,167 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
           </ul>
         </div>
 
+        {/* NEW INNOVATION: WHAT-IF / COUNTERFACTUAL SENSITIVITY SIMULATOR */}
+        <div className="p-5 rounded-2xl bg-zinc-900/70 border border-indigo-500/30 font-mono text-xs shadow-glow-safe">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-indigo-400" />
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                What-If Counterfactual Sensitivity Simulator
+              </h3>
+            </div>
+            <button
+              onClick={() => setShowCounterfactual(v => !v)}
+              className="text-[11px] text-indigo-300 hover:text-white underline underline-offset-2"
+            >
+              {showCounterfactual ? 'Hide Simulator' : 'Open What-If Simulator'}
+            </button>
+          </div>
+
+          {showCounterfactual && (
+            <div className="space-y-4 pt-2 border-t border-white/[0.06] animate-fadeIn">
+              <p className="text-zinc-400 text-xs font-sans">
+                Simulate how altering specific transaction attributes (amount, travel speed, device familiarity, nocturnal timing, or AI model) changes the model's risk score and decision boundary in real time.
+              </p>
+
+              {/* Sliders Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 p-3 rounded-xl bg-zinc-950 border border-white/[0.06]">
+                <div>
+                  <div className="flex justify-between text-zinc-300 mb-1">
+                    <span>Amount:</span>
+                    <span className="text-white font-bold">{cfAmount.toLocaleString()}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="500"
+                    max="100000"
+                    step="500"
+                    value={cfAmount}
+                    onChange={(e) => setCfAmount(Number(e.target.value))}
+                    className="w-full accent-indigo-400 cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-zinc-300 mb-1">
+                    <span>Transit Speed:</span>
+                    <span className="text-white font-bold">{cfSpeed} km/h</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="3000"
+                    step="50"
+                    value={cfSpeed}
+                    onChange={(e) => setCfSpeed(Number(e.target.value))}
+                    className="w-full accent-cyan-400 cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <span className="text-zinc-300 block mb-1">Hardware Device:</span>
+                  <button
+                    onClick={() => setCfNewDevice(v => v === 1 ? 0 : 1)}
+                    className={`w-full py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                      cfNewDevice === 1 ? 'bg-rose-500/20 border-rose-500/40 text-rose-300' : 'bg-zinc-800 text-zinc-300 border-white/[0.06]'
+                    }`}
+                  >
+                    {cfNewDevice === 1 ? 'New Hardware ID' : 'Trusted Device'}
+                  </button>
+                </div>
+
+                <div>
+                  <span className="text-zinc-300 block mb-1">Time of Day:</span>
+                  <button
+                    onClick={() => setCfNight(v => v === 1 ? 0 : 1)}
+                    className={`w-full py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                      cfNight === 1 ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' : 'bg-zinc-800 text-zinc-300 border-white/[0.06]'
+                    }`}
+                  >
+                    {cfNight === 1 ? 'Nocturnal (02:00)' : 'Daytime (Normal)'}
+                  </button>
+                </div>
+
+                <div>
+                  <span className="text-zinc-300 block mb-1">Inference Model:</span>
+                  <select
+                    value={cfModel}
+                    onChange={(e) => setCfModel(e.target.value)}
+                    className="w-full py-1.5 px-2 rounded-lg bg-zinc-900 border border-white/[0.08] text-white text-xs font-mono"
+                  >
+                    <option value="consensus_ensemble">Consensus Ensemble</option>
+                    <option value="lightgbm">LightGBM (GBDT)</option>
+                    <option value="xgboost">XGBoost</option>
+                    <option value="random_forest">Random Forest</option>
+                    <option value="multi_layer_perceptron_mlp">MLP Neural Net</option>
+                    <option value="logistic_regression">Logistic Regression</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={runCounterfactualSimulation}
+                  disabled={cfLoading}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition-all"
+                >
+                  <Play className={`w-3.5 h-3.5 ${cfLoading ? 'animate-spin' : ''}`} />
+                  <span>{cfLoading ? 'Re-evaluating Vector...' : 'Execute Counterfactual Recalculation'}</span>
+                </button>
+                <span className="text-[11px] text-zinc-400">Target Model: {cfModel}</span>
+              </div>
+
+              {/* Counterfactual Diff Results */}
+              {cfResult && (
+                <div className="p-4 rounded-xl bg-zinc-950 border border-white/[0.08] space-y-3 animate-fadeIn">
+                  <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/[0.06]">
+                    <div>
+                      <span className="text-[10px] text-zinc-400 block uppercase">Original vs Simulated Risk Score</span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-base text-zinc-400 line-through">
+                          {cfResult.original_risk_score} pts ({cfResult.original_status})
+                        </span>
+                        <ArrowRight className="w-4 h-4 text-indigo-400" />
+                        <span className="text-xl font-bold text-white">
+                          {cfResult.counterfactual_risk_score} pts ({cfResult.counterfactual_status})
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          cfResult.score_delta < 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                        }`}>
+                          {cfResult.score_delta > 0 ? `+${cfResult.score_delta}` : cfResult.score_delta} pts
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-[10px] text-zinc-400 block uppercase">Decision Status</span>
+                      <span className={`px-2.5 py-1 rounded text-xs font-bold ${
+                        cfResult.decision_flipped 
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' 
+                          : 'bg-zinc-800 text-zinc-300'
+                      }`}>
+                        {cfResult.decision_flipped ? 'DECISION FLIPPED' : 'DECISION UNCHANGED'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-zinc-400 block uppercase mb-1">Simulated Causal Factors:</span>
+                    <ul className="space-y-1">
+                      {cfResult.counterfactual_reasons.map((r, idx) => (
+                        <li key={idx} className="text-[11px] text-zinc-300 flex items-center gap-1.5">
+                          <span className="text-indigo-400">•</span>
+                          <span>{r}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Forensic Context & Telemetry Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Transaction Metadata */}
@@ -335,24 +532,41 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
           </div>
         </div>
 
-        {/* Analyst Actions Footer */}
-        <div className="flex flex-wrap items-center justify-between pt-4 border-t border-white/[0.08] gap-3">
-          <span className="text-xs text-zinc-400 font-mono">
-            Audited via Transact Guard Autonomous Security Pipeline
-          </span>
+        {/* Adaptive Friction & Analyst Action Footer */}
+        <div className="flex flex-wrap items-center justify-between pt-4 border-t border-white/[0.08] gap-3 font-mono text-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-zinc-400">Adaptive Friction:</span>
+            <button
+              onClick={() => handleVerifyStepUp('BIOMETRIC_TOUCHID')}
+              disabled={verifyingChallenge}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-[11px] font-semibold transition-all"
+            >
+              <Fingerprint className="w-3.5 h-3.5" />
+              <span>Verify Biometrics</span>
+            </button>
+            <button
+              onClick={() => handleVerifyStepUp('OTP_SMS')}
+              disabled={verifyingChallenge}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-[11px] font-semibold transition-all"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Verify OTP</span>
+            </button>
+          </div>
+
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowContinueConfirm(true)}
-              className="px-4 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-200 text-xs font-mono font-semibold transition-colors"
+              className="px-3.5 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-200 text-xs font-semibold transition-colors"
             >
-              Continue / Authorize Transaction
+              Authorize / Continue
             </button>
             <button
               onClick={() => {
                 if (onUpdateStatus) onUpdateStatus(transaction.id, 'BLOCKED');
                 onClose();
               }}
-              className="px-3.5 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 text-xs font-mono font-semibold transition-colors shadow-glow-danger"
+              className="px-3.5 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 text-xs font-semibold transition-colors shadow-glow-danger"
             >
               Confirm Threat & Block
             </button>

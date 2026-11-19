@@ -52,6 +52,35 @@ class TransactionResponse(TransactionBase):
     class Config:
         from_attributes = True
 
+class CounterfactualRequest(BaseModel):
+    transaction_id: Optional[str] = None
+    user_id: Optional[str] = None
+    amount: Optional[float] = None
+    speed_kmh: Optional[float] = None
+    is_new_device: Optional[int] = None
+    is_night: Optional[int] = None
+    is_new_beneficiary: Optional[int] = None
+    velocity_5m: Optional[int] = None
+    model_id: Optional[str] = None
+
+class CounterfactualResponse(BaseModel):
+    original_risk_score: float
+    original_risk_level: str
+    original_status: str
+    counterfactual_risk_score: float
+    counterfactual_risk_level: str
+    counterfactual_status: str
+    score_delta: float
+    decision_flipped: bool
+    active_model_used: str
+    counterfactual_reasons: List[str]
+    feature_breakdown: Dict[str, Any]
+
+class VerifyChallengeRequest(BaseModel):
+    challenge_type: str = "OTP_VERIFICATION"
+    verification_code: str = "123456"
+    analyst_override: bool = False
+
 class AlertUpdate(BaseModel):
     status: str # NEW, REVIEWING, RESOLVED, FALSE_POSITIVE, CONFIRMED_FRAUD
     analyst_notes: Optional[str] = None
@@ -73,6 +102,35 @@ class AlertResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class CounterfactualRequest(BaseModel):
+    transaction_id: Optional[str] = None
+    user_id: Optional[str] = None
+    amount: Optional[float] = None
+    speed_kmh: Optional[float] = None
+    is_new_device: Optional[int] = None
+    is_night: Optional[int] = None
+    is_new_beneficiary: Optional[int] = None
+    velocity_5m: Optional[int] = None
+    model_id: Optional[str] = None
+
+class CounterfactualResponse(BaseModel):
+    original_risk_score: float
+    original_risk_level: str
+    original_status: str
+    counterfactual_risk_score: float
+    counterfactual_risk_level: str
+    counterfactual_status: str
+    score_delta: float
+    decision_flipped: bool
+    active_model_used: str
+    counterfactual_reasons: List[str]
+    feature_breakdown: Dict[str, Any]
+
+class VerifyChallengeRequest(BaseModel):
+    challenge_type: str = "OTP_VERIFICATION"
+    verification_code: str = "123456"
+    analyst_override: bool = False
 
 class UserBehaviorProfileSchema(BaseModel):
     user_id: str
@@ -180,3 +238,32 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class CounterfactualRequest(BaseModel):
+    transaction_id: Optional[str] = None
+    user_id: Optional[str] = None
+    amount: Optional[float] = None
+    speed_kmh: Optional[float] = None
+    is_new_device: Optional[int] = None
+    is_night: Optional[int] = None
+    is_new_beneficiary: Optional[int] = None
+    velocity_5m: Optional[int] = None
+    model_id: Optional[str] = None
+
+class CounterfactualResponse(BaseModel):
+    original_risk_score: float
+    original_risk_level: str
+    original_status: str
+    counterfactual_risk_score: float
+    counterfactual_risk_level: str
+    counterfactual_status: str
+    score_delta: float
+    decision_flipped: bool
+    active_model_used: str
+    counterfactual_reasons: List[str]
+    feature_breakdown: Dict[str, Any]
+
+class VerifyChallengeRequest(BaseModel):
+    challenge_type: str = "OTP_VERIFICATION"
+    verification_code: str = "123456"
+    analyst_override: bool = False

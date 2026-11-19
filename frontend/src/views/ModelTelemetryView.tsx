@@ -1,9 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Cpu, 
   BarChart3, 
   ShieldCheck, 
-  Layers
+  Award, 
+  CheckCircle2, 
+  Zap, 
+  RefreshCw, 
+  Play
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -14,17 +18,118 @@ import {
   ResponsiveContainer, 
   Cell 
 } from 'recharts';
+import { api } from '../services/api';
+import type { ModelRegistryResponse, ModelBenchmark } from '../types';
 
 export const ModelTelemetryView: React.FC = () => {
-  // Feature importance data
-  const featureImportance = [
-    { name: 'Velocity Delta (Txn/Min)', importance: 0.32, color: '#f43f5e' },
-    { name: 'Impossible Travel Speed (km/h)', importance: 0.26, color: '#f97316' },
-    { name: 'Amount / Spending Envelope Ratio', importance: 0.18, color: '#f59e0b' },
-    { name: 'New Hardware Device Signature', importance: 0.11, color: '#8b5cf6' },
-    { name: 'Nocturnal Activity Anomaly (01-05h)', importance: 0.08, color: '#3b82f6' },
-    { name: 'New Unverified Beneficiary', importance: 0.05, color: '#10b981' },
-  ];
+  const [registry, setRegistry] = useState<ModelRegistryResponse | null>(null);
+  const [selectedModel, setSelectedModel] = useState<ModelBenchmark | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [switchingChampion, setSwitchingChampion] = useState<string | null>(null);
+  const [retraining, setRetraining] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Cross-inference test state
+  const [testAmount, setTestAmount] = useState<number>(45000);
+  const [testSpeed, setTestSpeed] = useState<number>(950);
+  const [testNewDevice, setTestNewDevice] = useState<number>(1);
+  const [testNight, setTestNight] = useState<number>(1);
+  const [comparisonResults, setComparisonResults] = useState<any>(null);
+  const [comparing, setComparing] = useState(false);
+
+  const fetchRegistry = async () => {
+    try {
+      setLoading(true);
+      const data = await api.getModelRegistry();
+      setRegistry(data);
+      if (data.leaderboard && data.leaderboard.length > 0) {
+        // Select champion or first model by default
+        const champ = data.leaderboard.find(m => m.model_id === data.champion_model_id) || data.leaderboard[0];
+        setSelectedModel(champ);
+      }
+    } catch (err) {
+      console.error('Failed to load model registry:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRegistry();
+  }, []);
+
+  const handleSelectChampion = async (modelId: string) => {
+    try {
+      setSwitchingChampion(modelId);
+      const res = await api.selectChampionModel(modelId);
+      setSuccessMsg(res.message);
+      if (registry) {
+        setRegistry({
+          ...registry,
+          champion_model_id: res.champion_model_id,
+          champion_model_name: res.champion_model_name
+        });
+      }
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err: any) {
+      alert(`Error setting champion: ${err.message}`);
+    } finally {
+      setSwitchingChampion(null);
+    }
+  };
+
+  const handleRetrain = async () => {
+    try {
+      setRetraining(true);
+      await api.triggerPipelineRetrain();
+      await fetchRegistry();
+      setSuccessMsg('Pipeline retraining completed successfully! All models refreshed.');
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err: any) {
+      alert(`Retraining error: ${err.message}`);
+    } finally {
+      setRetraining(false);
+    }
+  };
+
+  const handleRunComparison = async () => {
+    try {
+      setComparing(true);
+      const res = await api.compareModelInferences({
+        amount: testAmount,
+        amount_ratio: testAmount / 3000,
+        z_score: (testAmount - 3000) / 1000,
+        hour: testNight ? 3 : 14,
+        is_night: testNight,
+        is_preferred_hour: testNight ? 0 : 1,
+        is_new_device: testNewDevice,
+        is_new_location: testSpeed > 500 ? 1 : 0,
+        distance_from_base_km: testSpeed > 500 ? 4500 : 15,
+        speed_kmh: testSpeed,
+        velocity_5m: 1,
+        velocity_1h: 2,
+        velocity_24h: 4,
+        is_new_beneficiary: 0
+      });
+      setComparisonResults(res);
+    } catch (err: any) {
+      alert(`Comparison failed: ${err.message}`);
+    } finally {
+      setComparing(false);
+    }
+  };
+
+  // Convert feature importances to array for bar chart
+  const featureImportanceList = registry?.feature_importances 
+    ? Object.entries(registry.feature_importances).slice(0, 7).map(([name, imp], idx) => {
+        const colors = ['#f43f5e', '#f97316', '#f59e0b', '#8b5cf6', '#3b82f6', '#10b981', '#06b6d4'];
+        return {
+          name: name.replace(/_/g, ' ').toUpperCase(),
+          importance: imp,
+          color: colors[idx % colors.length]
+        };
+      })
+    : [];
 
   return (
     <div className="space-y-6">
@@ -37,101 +142,295 @@ export const ModelTelemetryView: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-white font-mono tracking-tight">
-                NEURAL ENGINE & MODEL INTELLIGENCE TELEMETRY
+                MULTI-MODEL INTELLIGENCE & TOURNAMENT REGISTRY
               </h1>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800">
-                ACTIVE EVALUATION
+                ACTIVE FLEET: {registry?.active_models_count || 6} MODELS
               </span>
             </div>
             <p className="text-xs text-zinc-400 font-mono mt-0.5">
-              Production benchmarks, SHAP feature importance vectors, and confusion matrix calibration
+              Champion-Challenger tournament leaderboard, cross-model consensus, and runtime model switching
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.08] text-xs font-mono">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-zinc-300">Model Version:</span>
-          <span className="text-white font-bold">LGBM-IF-v2.4.1</span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleRetrain}
+            disabled={retraining}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-mono font-semibold transition-all disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${retraining ? 'animate-spin' : ''}`} />
+            <span>{retraining ? 'Retraining Pipeline...' : 'Retrain Pipeline'}</span>
+          </button>
+
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.08] text-xs font-mono">
+            <Award className="w-4 h-4 text-amber-400" />
+            <span className="text-zinc-300">Champion Model:</span>
+            <span className="text-white font-bold">{registry?.champion_model_name || 'Consensus Ensemble'}</span>
+          </div>
         </div>
       </div>
 
-      {/* Primary Production Metrics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div className="glass-panel rounded-2xl p-4 border border-white/[0.08] font-mono">
-          <span className="text-[11px] text-zinc-400 block uppercase">ROC-AUC Score</span>
-          <span className="text-2xl font-bold text-emerald-400 mt-1 block">1.000</span>
-          <span className="text-[10px] text-zinc-400">Perfect discrimination</span>
+      {/* Success Notification */}
+      {successMsg && (
+        <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center gap-2 animate-fadeIn">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          <span>{successMsg}</span>
+        </div>
+      )}
+
+      {/* Top High-Level Dataset KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 font-mono">
+        <div className="glass-panel rounded-2xl p-4 border border-white/[0.08]">
+          <span className="text-[10px] text-zinc-400 block uppercase">Training Dataset</span>
+          <span className="text-xl font-bold text-white mt-1 block">
+            {registry?.dataset?.train_samples?.toLocaleString() || '15,000'} samples
+          </span>
+          <span className="text-[10px] text-zinc-400">Total: {registry?.dataset?.total_samples?.toLocaleString() || '20,000'}</span>
         </div>
 
-        <div className="glass-panel rounded-2xl p-4 border border-white/[0.08] font-mono">
-          <span className="text-[11px] text-zinc-400 block uppercase">PR-AUC Score</span>
-          <span className="text-2xl font-bold text-emerald-400 mt-1 block">1.000</span>
-          <span className="text-[10px] text-zinc-400">Zero false alarms</span>
+        <div className="glass-panel rounded-2xl p-4 border border-white/[0.08]">
+          <span className="text-[10px] text-zinc-400 block uppercase">Holdout Test Set</span>
+          <span className="text-xl font-bold text-cyan-400 mt-1 block">
+            {registry?.dataset?.test_samples?.toLocaleString() || '5,000'} samples
+          </span>
+          <span className="text-[10px] text-zinc-400">Stratified split</span>
         </div>
 
-        <div className="glass-panel rounded-2xl p-4 border border-white/[0.08] font-mono">
-          <span className="text-[11px] text-zinc-400 block uppercase">P99 Latency</span>
-          <span className="text-2xl font-bold text-cyan-400 mt-1 block">16.8 ms</span>
-          <span className="text-[10px] text-zinc-400">End-to-end evaluation</span>
+        <div className="glass-panel rounded-2xl p-4 border border-white/[0.08]">
+          <span className="text-[10px] text-zinc-400 block uppercase">Dataset Fraud Imbalance</span>
+          <span className="text-xl font-bold text-rose-400 mt-1 block">
+            {registry?.dataset?.fraud_rate_pct || '2.0'}%
+          </span>
+          <span className="text-[10px] text-zinc-400">Severe imbalanced flow</span>
         </div>
 
-        <div className="glass-panel rounded-2xl p-4 border border-white/[0.08] font-mono">
-          <span className="text-[11px] text-zinc-400 block uppercase">Model Accuracy</span>
-          <span className="text-2xl font-bold text-white mt-1 block">99.82%</span>
-          <span className="text-[10px] text-zinc-400">Validated on holdout</span>
+        <div className="glass-panel rounded-2xl p-4 border border-white/[0.08]">
+          <span className="text-[10px] text-zinc-400 block uppercase">Evaluated Features</span>
+          <span className="text-xl font-bold text-amber-400 mt-1 block">
+            {registry?.dataset?.features_count || '14'} Telemetry Vectors
+          </span>
+          <span className="text-[10px] text-zinc-400">Spatial, temporal, velocity</span>
         </div>
 
-        <div className="glass-panel rounded-2xl p-4 border border-white/[0.08] font-mono">
-          <span className="text-[11px] text-zinc-400 block uppercase">F1-Score (Fraud)</span>
-          <span className="text-2xl font-bold text-purple-400 mt-1 block">0.994</span>
-          <span className="text-[10px] text-zinc-400">Harmonic mean balance</span>
+        <div className="glass-panel rounded-2xl p-4 border border-white/[0.08]">
+          <span className="text-[10px] text-zinc-400 block uppercase">Fastest Prediction</span>
+          <span className="text-xl font-bold text-emerald-400 mt-1 block">
+            {registry?.leaderboard ? Math.min(...registry.leaderboard.map(m => m.latency_ms)).toFixed(2) : '0.14'} ms
+          </span>
+          <span className="text-[10px] text-zinc-400">Single-sample inference</span>
         </div>
       </div>
 
-      {/* Feature Importance & Confusion Matrix Grid */}
+      {/* Model Tournament Leaderboard Table */}
+      <div className="glass-panel rounded-2xl p-5 border border-white/[0.08]">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Award className="w-4 h-4 text-amber-400" />
+              <h3 className="text-sm font-semibold text-white font-mono tracking-tight">
+                Model Tournament Leaderboard & Champion Registry
+              </h3>
+            </div>
+            <p className="text-xs text-zinc-400 mt-0.5 font-sans">
+              Compare candidate models on Precision-Recall AUC, F1-Score, and single-sample inference latency. Click any row to inspect its confusion matrix.
+            </p>
+          </div>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">
+            Sorted by PR-AUC
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left font-mono text-xs">
+            <thead>
+              <tr className="border-b border-white/[0.08] text-zinc-400 uppercase text-[10px]">
+                <th className="py-2.5 px-3">Rank / Model</th>
+                <th className="py-2.5 px-3">Architecture Category</th>
+                <th className="py-2.5 px-3 text-right">PR-AUC</th>
+                <th className="py-2.5 px-3 text-right">ROC-AUC</th>
+                <th className="py-2.5 px-3 text-right">F1-Score</th>
+                <th className="py-2.5 px-3 text-right">Recall</th>
+                <th className="py-2.5 px-3 text-right">Accuracy</th>
+                <th className="py-2.5 px-3 text-right">Latency</th>
+                <th className="py-2.5 px-3 text-center">Status / Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.04]">
+              {loading ? (
+                <tr>
+                  <td colSpan={9} className="py-8 text-center text-zinc-400">
+                    Loading Model Registry Telemetry...
+                  </td>
+                </tr>
+              ) : (
+                registry?.leaderboard.map((m, idx) => {
+                  const isChampion = registry.champion_model_id === m.model_id;
+                  const isSelected = selectedModel?.model_id === m.model_id;
+
+                  return (
+                    <tr 
+                      key={m.model_id}
+                      onClick={() => setSelectedModel(m)}
+                      className={`hover:bg-white/[0.02] cursor-pointer transition-colors ${
+                        isSelected ? 'bg-indigo-600/10' : ''
+                      }`}
+                    >
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                            idx === 0 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-zinc-800 text-zinc-400'
+                          }`}>
+                            {idx + 1}
+                          </span>
+                          <div>
+                            <span className="font-semibold text-white block">{m.name}</span>
+                            <span className="text-[10px] text-zinc-400 font-sans">{m.file}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] bg-zinc-900 border border-white/[0.06] text-zinc-300">
+                          {m.category}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right font-bold text-emerald-400">{m.pr_auc.toFixed(4)}</td>
+                      <td className="py-3 px-3 text-right text-indigo-300">{m.roc_auc.toFixed(4)}</td>
+                      <td className="py-3 px-3 text-right font-semibold text-purple-300">{m.f1_score.toFixed(4)}</td>
+                      <td className="py-3 px-3 text-right text-zinc-300">{m.recall}%</td>
+                      <td className="py-3 px-3 text-right text-zinc-300">{m.accuracy}%</td>
+                      <td className="py-3 px-3 text-right font-mono text-cyan-300">{m.latency_ms} ms</td>
+                      <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        {isChampion ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
+                            <CheckCircle2 className="w-3 h-3" />
+                            ACTIVE CHAMPION
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleSelectChampion(m.model_id)}
+                            disabled={switchingChampion === m.model_id}
+                            className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-indigo-600 text-zinc-300 hover:text-white border border-white/[0.08] text-[10px] font-semibold transition-all"
+                          >
+                            {switchingChampion === m.model_id ? 'Activating...' : 'Make Champion'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Confusion Matrix & SHAP Feature Importance Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* SHAP Feature Importance */}
+        {/* Confusion Matrix for Selected Model */}
+        <div className="glass-panel rounded-2xl p-5 border border-white/[0.08] flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-sm font-semibold text-white font-mono tracking-tight">
+                  Confusion Matrix: {selectedModel?.name || 'Selected Model'}
+                </h3>
+              </div>
+              <p className="text-xs text-zinc-400 mt-0.5 font-sans">
+                True vs Predicted distributions on holdout test set (5,000 samples)
+              </p>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
+              {selectedModel?.category}
+            </span>
+          </div>
+
+          {selectedModel && (
+            <div className="grid grid-cols-2 gap-3 my-2 font-mono">
+              <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/30">
+                <span className="text-[10px] text-zinc-400 block">TRUE NEGATIVE (Legitimate Pass)</span>
+                <span className="text-2xl font-bold text-emerald-400 mt-1 block">
+                  {selectedModel.confusion_matrix.true_negative.toLocaleString()}
+                </span>
+                <span className="text-[10px] text-emerald-300/80">Correctly Cleared</span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-zinc-900/60 border border-white/[0.08]">
+                <span className="text-[10px] text-zinc-400 block">FALSE POSITIVE (False Alarm)</span>
+                <span className="text-2xl font-bold text-amber-400 mt-1 block">
+                  {selectedModel.confusion_matrix.false_positive}
+                </span>
+                <span className="text-[10px] text-amber-300/80">Unnecessary Friction</span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-zinc-900/60 border border-white/[0.08]">
+                <span className="text-[10px] text-zinc-400 block">FALSE NEGATIVE (Missed Threat)</span>
+                <span className="text-2xl font-bold text-rose-400 mt-1 block">
+                  {selectedModel.confusion_matrix.false_negative}
+                </span>
+                <span className="text-[10px] text-rose-300/80">Escaped Detection</span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-500/40 shadow-glow-danger">
+                <span className="text-[10px] text-rose-300 block">TRUE POSITIVE (Threat Neutralized)</span>
+                <span className="text-2xl font-bold text-rose-400 mt-1 block">
+                  {selectedModel.confusion_matrix.true_positive}
+                </span>
+                <span className="text-[10px] text-rose-200">100% Intercepted</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between text-xs font-mono text-zinc-400 pt-3 border-t border-white/[0.06] mt-4">
+            <span>Precision: <strong className="text-white">{selectedModel?.precision}%</strong></span>
+            <span>Recall: <strong className="text-white">{selectedModel?.recall}%</strong></span>
+            <span>Latency: <strong className="text-cyan-400">{selectedModel?.latency_ms} ms</strong></span>
+          </div>
+        </div>
+
+        {/* Global SHAP Feature Importance */}
         <div className="glass-panel rounded-2xl p-5 border border-white/[0.08] flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-cyan-400" />
                 <h3 className="text-sm font-semibold text-white font-mono tracking-tight">
-                  Global Feature Attribution (SHAP Importance)
+                  Global Feature Attribution (Feature Importance)
                 </h3>
               </div>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Relative influence of telemetry signals in determining fraud risk scores
+              <p className="text-xs text-zinc-400 mt-0.5 font-sans">
+                Relative influence of telemetry signals in identifying fraudulent transactions
               </p>
             </div>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
-              LGBM Trees
+              Tree GBDT Vectors
             </span>
           </div>
 
-          <div className="h-[280px] w-full">
+          <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 layout="vertical"
-                data={featureImportance}
-                margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                data={featureImportanceList}
+                margin={{ top: 5, right: 30, left: 30, bottom: 5 }}
               >
                 <XAxis 
                   type="number" 
-                  domain={[0, 0.4]} 
+                  domain={[0, 0.35]} 
                   stroke="#71717a" 
                   fontSize={10} 
-                  fontFamily="JetBrains Mono"
+                  fontFamily="Consolas"
                   tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
                 />
                 <YAxis 
                   type="category" 
                   dataKey="name" 
                   stroke="#a1a1aa" 
-                  fontSize={11} 
-                  fontFamily="JetBrains Mono"
-                  width={180}
+                  fontSize={10} 
+                  fontFamily="Consolas"
+                  width={150}
                   tickLine={false}
                 />
                 <Tooltip
@@ -149,7 +448,7 @@ export const ModelTelemetryView: React.FC = () => {
                   }}
                 />
                 <Bar dataKey="importance" radius={[0, 4, 4, 0]}>
-                  {featureImportance.map((entry, index) => (
+                  {featureImportanceList.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Bar>
@@ -157,135 +456,138 @@ export const ModelTelemetryView: React.FC = () => {
             </ResponsiveContainer>
           </div>
         </div>
-
-        {/* Confusion Matrix & Calibration Grid */}
-        <div className="glass-panel rounded-2xl p-5 border border-white/[0.08] flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <h3 className="text-sm font-semibold text-white font-mono tracking-tight">
-                  Confusion Matrix & Error Calibration
-                </h3>
-              </div>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Evaluation results on 100,000 real-world synthetic validation vectors
-              </p>
-            </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-              Optimal Threshold: 0.65
-            </span>
-          </div>
-
-          {/* 2x2 Confusion Grid */}
-          <div className="grid grid-cols-2 gap-3 my-auto">
-            {/* True Negative */}
-            <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/30 font-mono">
-              <span className="text-[10px] text-zinc-400 block">TRUE NEGATIVE (Legitimate Pass)</span>
-              <span className="text-2xl font-bold text-emerald-400 mt-1 block">99,410</span>
-              <div className="flex justify-between items-center text-[10px] text-zinc-400 mt-1">
-                <span>99.41% Correct</span>
-                <span className="text-emerald-300 font-semibold">Zero Friction</span>
-              </div>
-            </div>
-
-            {/* False Positive */}
-            <div className="p-4 rounded-xl bg-zinc-900/60 border border-white/[0.08] font-mono">
-              <span className="text-[10px] text-zinc-400 block">FALSE POSITIVE (False Alarm)</span>
-              <span className="text-2xl font-bold text-amber-400 mt-1 block">18</span>
-              <div className="flex justify-between items-center text-[10px] text-zinc-400 mt-1">
-                <span>0.018% Rate</span>
-                <span className="text-amber-300 font-semibold">Self-Healing</span>
-              </div>
-            </div>
-
-            {/* False Negative */}
-            <div className="p-4 rounded-xl bg-zinc-900/60 border border-white/[0.08] font-mono">
-              <span className="text-[10px] text-zinc-400 block">FALSE NEGATIVE (Missed Threat)</span>
-              <span className="text-2xl font-bold text-rose-400 mt-1 block">2</span>
-              <div className="flex justify-between items-center text-[10px] text-zinc-400 mt-1">
-                <span>0.002% Miss</span>
-                <span className="text-rose-300 font-semibold">Rule Safety Net</span>
-              </div>
-            </div>
-
-            {/* True Positive */}
-            <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-500/40 font-mono shadow-glow-danger">
-              <span className="text-[10px] text-rose-300 block">TRUE POSITIVE (Threat Neutralized)</span>
-              <span className="text-2xl font-bold text-rose-400 mt-1 block">570</span>
-              <div className="flex justify-between items-center text-[10px] text-rose-300/80 mt-1">
-                <span>99.65% Recall</span>
-                <span className="text-rose-200 font-bold">100% Intercepted</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between text-xs font-mono text-zinc-400 pt-3 border-t border-white/[0.06] mt-4">
-            <span>Precision: <strong className="text-white">96.9%</strong></span>
-            <span>Recall: <strong className="text-white">99.6%</strong></span>
-            <span>Specificity: <strong className="text-white">99.98%</strong></span>
-          </div>
-        </div>
       </div>
 
-      {/* Model Stack Architectural Blueprint */}
-      <div className="glass-panel rounded-2xl p-5 border border-white/[0.08]">
-        <div className="flex items-center gap-2 mb-4">
-          <Layers className="w-4 h-4 text-purple-400" />
-          <h3 className="text-sm font-semibold text-white font-mono tracking-tight">
-            Autonomous Pipeline Multi-Signal Weighting Stack
-          </h3>
+      {/* Multi-Model Cross-Inference Playground */}
+      <div className="glass-panel rounded-2xl p-6 border border-white/[0.08]">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-amber-400" />
+              <h3 className="text-sm font-semibold text-white font-mono tracking-tight">
+                Multi-Model Cross-Inference & Consensus Playground
+              </h3>
+            </div>
+            <p className="text-xs text-zinc-400 mt-0.5 font-sans">
+              Inject a custom test telemetry vector and observe real-time predictions across all 6 models simultaneously
+            </p>
+          </div>
+          <button
+            onClick={handleRunComparison}
+            disabled={comparing}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-mono font-bold transition-all shadow-glow-warning"
+          >
+            <Play className={`w-3.5 h-3.5 ${comparing ? 'animate-spin' : ''}`} />
+            <span>{comparing ? 'Evaluating Fleet...' : 'Run Cross-Inference'}</span>
+          </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="p-4 rounded-xl bg-zinc-900/50 border border-white/[0.06]">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono text-white font-semibold">1. Supervised ML</span>
-              <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
-                Weight: 35%
-              </span>
+        {/* Sliders and Toggles */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-4 rounded-xl bg-zinc-900/60 border border-white/[0.06] mb-5 font-mono text-xs">
+          <div>
+            <div className="flex justify-between text-zinc-300 mb-1">
+              <span>Amount:</span>
+              <span className="font-bold text-white">◈ {testAmount.toLocaleString()}</span>
             </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              LightGBM GBDT trained on 28 temporal and spatial features. Outputs calibrated fraud likelihood in &lt;5ms.
-            </p>
+            <input
+              type="range"
+              min="500"
+              max="100000"
+              step="500"
+              value={testAmount}
+              onChange={(e) => setTestAmount(Number(e.target.value))}
+              className="w-full accent-amber-400 cursor-pointer"
+            />
           </div>
 
-          <div className="p-4 rounded-xl bg-zinc-900/50 border border-white/[0.06]">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono text-white font-semibold">2. Isolation Forest</span>
-              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                Weight: 25%
-              </span>
+          <div>
+            <div className="flex justify-between text-zinc-300 mb-1">
+              <span>Speed:</span>
+              <span className="font-bold text-white">{testSpeed} km/h</span>
             </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Unsupervised anomaly clustering isolating zero-day exploits, sudden outlier deviations, and atypical payload shapes.
-            </p>
+            <input
+              type="range"
+              min="0"
+              max="2500"
+              step="50"
+              value={testSpeed}
+              onChange={(e) => setTestSpeed(Number(e.target.value))}
+              className="w-full accent-cyan-400 cursor-pointer"
+            />
           </div>
 
-          <div className="p-4 rounded-xl bg-zinc-900/50 border border-white/[0.06]">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono text-white font-semibold">3. Dynamic Rules</span>
-              <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                Weight: 25%
-              </span>
-            </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Deterministic security assertions: Impossible travel (&gt;800km/h), rapid velocity burst, and nighttime surge thresholds.
-            </p>
+          <div>
+            <span className="text-zinc-300 block mb-1">Device Signature:</span>
+            <button
+              onClick={() => setTestNewDevice(v => v === 1 ? 0 : 1)}
+              className={`w-full py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                testNewDevice === 1 
+                  ? 'bg-rose-500/20 border-rose-500/40 text-rose-300' 
+                  : 'bg-zinc-800 border-white/[0.06] text-zinc-400'
+              }`}
+            >
+              {testNewDevice === 1 ? 'Unknown Hardware (New)' : 'Trusted Device (Known)'}
+            </button>
           </div>
 
-          <div className="p-4 rounded-xl bg-zinc-900/50 border border-white/[0.06]">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono text-white font-semibold">4. Velocity Surge</span>
-              <span className="text-[10px] font-mono text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
-                Weight: 15%
-              </span>
-            </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Sliding-window frequency analysis monitoring multi-channel debit attempts per second to thwart automated botnet drain attacks.
-            </p>
+          <div>
+            <span className="text-zinc-300 block mb-1">Time of Day:</span>
+            <button
+              onClick={() => setTestNight(v => v === 1 ? 0 : 1)}
+              className={`w-full py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                testNight === 1 
+                  ? 'bg-purple-500/20 border-purple-500/40 text-purple-300' 
+                  : 'bg-zinc-800 border-white/[0.06] text-zinc-400'
+              }`}
+            >
+              {testNight === 1 ? '03:00 AM (Nocturnal)' : '02:00 PM (Business Hours)'}
+            </button>
           </div>
         </div>
+
+        {/* Comparison Output Grid */}
+        {comparisonResults && (
+          <div className="space-y-3 animate-fadeIn">
+            <div className="flex items-center justify-between text-xs font-mono p-3 rounded-xl bg-zinc-950 border border-white/[0.08]">
+              <span className="text-zinc-300">Fleet Consensus Agreement:</span>
+              <div className="flex items-center gap-3">
+                <span className={`px-2 py-0.5 rounded font-bold ${
+                  comparisonResults.consensus_agreement === 'HIGH' 
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                }`}>
+                  {comparisonResults.consensus_agreement} CONSENSUS
+                </span>
+                <span className="text-zinc-400">
+                  Model Variance: <strong>{comparisonResults.model_variance}</strong>
+                </span>
+                <span className="text-zinc-400">
+                  Fleet Mean Prob: <strong className="text-white">{(comparisonResults.average_probability * 100).toFixed(1)}%</strong>
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 font-mono text-xs">
+              {Object.entries(comparisonResults.model_predictions).map(([id, info]: any) => (
+                <div key={id} className="p-3 rounded-xl bg-zinc-950 border border-white/[0.06] flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] text-zinc-400 block truncate">{info.name}</span>
+                    <span className="text-base font-bold text-white mt-1 block">
+                      {(info.probability * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                  <span className={`mt-2 text-[9px] px-1.5 py-0.5 rounded text-center font-bold ${
+                    info.verdict === 'FRAUD' 
+                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
+                      : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  }`}>
+                    {info.verdict}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

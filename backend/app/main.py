@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.db.session import engine, Base, SessionLocal
-from app.api import transactions, alerts, users, dashboard, simulator, webhook
+from app.api import transactions, alerts, users, dashboard, simulator, webhook, models, graph
 from app.api.transactions import set_ws_broadcast_callback
 
 # Active WebSocket connections pool
@@ -78,6 +78,8 @@ app.include_router(users.router, prefix=settings.API_V1_STR)
 app.include_router(dashboard.router, prefix=settings.API_V1_STR)
 app.include_router(simulator.router, prefix=settings.API_V1_STR)
 app.include_router(webhook.router, prefix=settings.API_V1_STR)
+app.include_router(models.router, prefix=settings.API_V1_STR)
+app.include_router(graph.router, prefix=settings.API_V1_STR)
 
 @app.websocket("/ws/transactions")
 async def websocket_transactions_stream(websocket: WebSocket):

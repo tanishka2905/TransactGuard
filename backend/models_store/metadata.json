@@ -1,35 +1,158 @@
 {
-  "version": "v2.4.0",
-  "model_type": "RandomForestClassifier + IsolationForest",
-  "training_samples": 13500,
-  "test_samples": 4500,
-  "roc_auc": 1.0,
-  "pr_auc": 1.0,
-  "confusion_matrix": [
-    [
-      4419,
-      0
-    ],
-    [
-      0,
-      81
-    ]
+  "version": "v3.0.0",
+  "champion_model_id": "consensus_ensemble",
+  "champion_model_name": "Consensus Ensemble",
+  "active_models_count": 6,
+  "dataset": {
+    "total_samples": 20000,
+    "train_samples": 15000,
+    "test_samples": 5000,
+    "fraud_rate_pct": 2.0,
+    "features_count": 14
+  },
+  "leaderboard": [
+    {
+      "model_id": "random_forest",
+      "name": "Random Forest",
+      "category": "Tree Ensemble",
+      "accuracy": 100.0,
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1_score": 1.0,
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "confusion_matrix": {
+        "true_negative": 4900,
+        "false_positive": 0,
+        "false_negative": 0,
+        "true_positive": 100
+      },
+      "latency_ms": 26.54,
+      "training_time_s": 0.37,
+      "file": "rf_classifier.joblib",
+      "requires_scaling": false
+    },
+    {
+      "model_id": "lightgbm",
+      "name": "LightGBM",
+      "category": "Gradient Boosting",
+      "accuracy": 100.0,
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1_score": 1.0,
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "confusion_matrix": {
+        "true_negative": 4900,
+        "false_positive": 0,
+        "false_negative": 0,
+        "true_positive": 100
+      },
+      "latency_ms": 1.83,
+      "training_time_s": 0.1,
+      "file": "lgbm_classifier.joblib",
+      "requires_scaling": false
+    },
+    {
+      "model_id": "xgboost",
+      "name": "XGBoost",
+      "category": "Gradient Boosting",
+      "accuracy": 100.0,
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1_score": 1.0,
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "confusion_matrix": {
+        "true_negative": 4900,
+        "false_positive": 0,
+        "false_negative": 0,
+        "true_positive": 100
+      },
+      "latency_ms": 2.12,
+      "training_time_s": 0.14,
+      "file": "xgb_classifier.joblib",
+      "requires_scaling": false
+    },
+    {
+      "model_id": "multi_layer_perceptron_mlp",
+      "name": "Multi-Layer Perceptron (MLP)",
+      "category": "Deep Neural Network",
+      "accuracy": 99.96,
+      "precision": 100.0,
+      "recall": 98.0,
+      "f1_score": 0.9899,
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "confusion_matrix": {
+        "true_negative": 4900,
+        "false_positive": 0,
+        "false_negative": 2,
+        "true_positive": 98
+      },
+      "latency_ms": 0.2,
+      "training_time_s": 0.75,
+      "file": "mlp_neural_net.joblib",
+      "requires_scaling": true
+    },
+    {
+      "model_id": "logistic_regression",
+      "name": "Logistic Regression",
+      "category": "Linear Baseline",
+      "accuracy": 100.0,
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1_score": 1.0,
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "confusion_matrix": {
+        "true_negative": 4900,
+        "false_positive": 0,
+        "false_negative": 0,
+        "true_positive": 100
+      },
+      "latency_ms": 0.14,
+      "training_time_s": 0.03,
+      "file": "logistic_regression.joblib",
+      "requires_scaling": true
+    },
+    {
+      "model_id": "consensus_ensemble",
+      "name": "Consensus Ensemble",
+      "category": "Meta-Classifier Ensemble",
+      "accuracy": 100.0,
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1_score": 1.0,
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "confusion_matrix": {
+        "true_negative": 4900,
+        "false_positive": 0,
+        "false_negative": 0,
+        "true_positive": 100
+      },
+      "latency_ms": 35.38,
+      "training_time_s": 1.2,
+      "file": "consensus_ensemble.joblib",
+      "requires_scaling": false
+    }
   ],
   "feature_importances": {
-    "amount": 0.2702,
-    "distance_from_base_km": 0.1986,
-    "amount_ratio": 0.1738,
-    "velocity_1h": 0.1008,
-    "z_score": 0.0756,
-    "velocity_5m": 0.0634,
-    "is_new_location": 0.0459,
-    "velocity_24h": 0.0323,
-    "speed_kmh": 0.0278,
-    "is_preferred_hour": 0.0106,
-    "is_new_device": 0.0005,
-    "hour": 0.0004,
-    "is_new_beneficiary": 0.0003,
-    "is_night": 0.0
+    "amount": 0.2698,
+    "distance_from_base_km": 0.1966,
+    "amount_ratio": 0.17,
+    "velocity_1h": 0.0983,
+    "z_score": 0.0751,
+    "velocity_24h": 0.0634,
+    "is_new_location": 0.0552,
+    "velocity_5m": 0.0392,
+    "speed_kmh": 0.0193,
+    "is_new_device": 0.0064,
+    "is_new_beneficiary": 0.0057,
+    "is_preferred_hour": 0.0007,
+    "is_night": 0.0003,
+    "hour": 0.0
   },
   "feature_columns": [
     "amount",
@@ -46,5 +169,6 @@
     "velocity_1h",
     "velocity_24h",
     "is_new_beneficiary"
-  ]
+  ],
+  "last_trained_timestamp": "2026-11-19T09:00:58Z"
 }
