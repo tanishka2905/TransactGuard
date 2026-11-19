@@ -93,13 +93,25 @@ async function fetchIpLocation(): Promise<{ lat: number; lon: number; city: stri
   return null;
 }
 
+const CACHE_CITY = 'tg_geo_city';
+const CACHE_LAT = 'tg_geo_lat';
+const CACHE_LON = 'tg_geo_lon';
+
 export function useGeoLocation(): GeoLocationState {
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
-  const [accuracy, setAccuracy] = useState<number | null>(null);
-  const [cityName, setCityName] = useState<string>('Detecting Real Location...');
-  const [isGpsAcquired, setIsGpsAcquired] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [latitude, setLatitude] = useState<number | null>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem(CACHE_LAT) : null;
+    return saved ? Number(saved) : 28.8389;
+  });
+  const [longitude, setLongitude] = useState<number | null>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem(CACHE_LON) : null;
+    return saved ? Number(saved) : 78.7768;
+  });
+  const [accuracy, setAccuracy] = useState<number | null>(50);
+  const [cityName, setCityName] = useState<string>(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem(CACHE_CITY)) || 'Moradabad, UP, IN';
+  });
+  const [isGpsAcquired, setIsGpsAcquired] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // Time state
@@ -134,14 +146,18 @@ export function useGeoLocation(): GeoLocationState {
         const state = address.state ? `, ${address.state}` : '';
         const countryCode = (address.country_code || 'in').toUpperCase();
         if (city) {
-          setCityName(`${city}${state}, ${countryCode}`);
+          const formatted = `${city}${state}, ${countryCode}`;
+          setCityName(formatted);
+          if (typeof window !== 'undefined') localStorage.setItem(CACHE_CITY, formatted);
           return;
         }
       }
     } catch {
       // Fallback silently to coordinate approximation
     }
-    setCityName(resolveApproximateCity(lat, lon));
+    const resolved = resolveApproximateCity(lat, lon);
+    setCityName(resolved);
+    if (typeof window !== 'undefined') localStorage.setItem(CACHE_CITY, resolved);
   };
 
   const acquireLocation = useCallback(async () => {
@@ -157,8 +173,12 @@ export function useGeoLocation(): GeoLocationState {
         setLongitude(ipLoc.lon);
         setCityName(ipLoc.city);
         setIsGpsAcquired(true);
-        setLoading(false);
         ipFound = true;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(CACHE_CITY, ipLoc.city);
+          localStorage.setItem(CACHE_LAT, String(ipLoc.lat));
+          localStorage.setItem(CACHE_LON, String(ipLoc.lon));
+        }
       }
     } catch (e) {
       console.warn('[useGeoLocation] IP lookup fallback failed', e);
@@ -174,7 +194,10 @@ export function useGeoLocation(): GeoLocationState {
           setLongitude(lon);
           setAccuracy(position.coords.accuracy);
           setIsGpsAcquired(true);
-          setLoading(false);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(CACHE_LAT, String(lat));
+            localStorage.setItem(CACHE_LON, String(lon));
+          }
           await reverseGeocode(lat, lon);
         },
         (err) => {
@@ -182,13 +205,11 @@ export function useGeoLocation(): GeoLocationState {
           if (!ipFound) {
             console.warn('[useGeoLocation] Browser GPS error:', err.message);
             setError(err.message);
-            // Default to real IP or detected coordinates
             setLatitude(28.8389);
             setLongitude(78.7768);
             setAccuracy(50);
             setCityName('Moradabad, UP, IN');
             setIsGpsAcquired(true);
-            setLoading(false);
           }
         },
         {
@@ -198,19 +219,25 @@ export function useGeoLocation(): GeoLocationState {
         }
       );
     } else if (!ipFound) {
-      // Fallback
       setLatitude(28.8389);
       setLongitude(78.7768);
       setCityName('Moradabad, UP, IN');
       setIsGpsAcquired(true);
-      setLoading(false);
     }
+    setLoading(false);
   }, []);
 
   const setCustomLocation = (city: string, customLat?: number, customLon?: number) => {
     setCityName(city);
-    if (customLat !== undefined) setLatitude(customLat);
-    if (customLon !== undefined) setLongitude(customLon);
+    if (customLat !== undefined) {
+      setLatitude(customLat);
+      if (typeof window !== 'undefined') localStorage.setItem(CACHE_LAT, String(customLat));
+    }
+    if (customLon !== undefined) {
+      setLongitude(customLon);
+      if (typeof window !== 'undefined') localStorage.setItem(CACHE_LON, String(customLon));
+    }
+    if (typeof window !== 'undefined') localStorage.setItem(CACHE_CITY, city);
     setIsGpsAcquired(true);
   };
 

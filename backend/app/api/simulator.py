@@ -82,13 +82,20 @@ async def trigger_scenario(
             return await execute_p2p_transfer(req, db)
 
     profile = db.query(UserBehaviorProfile).filter(UserBehaviorProfile.user_id == user_id).first()
+    user_obj = db.query(User).filter(User.id == user_id).first()
     known_device = profile.known_devices[0] if profile and profile.known_devices else "dev_macbook_pro"
-    known_loc = profile.known_locations[0] if profile and profile.known_locations else "Mumbai, IN"
-    typical_lat = profile.typical_lat if profile else 19.0760
-    typical_lon = profile.typical_lon if profile else 72.8777
+    known_loc = (profile.known_locations[0] if profile and profile.known_locations else (user_obj.city if user_obj else "Moradabad, UP, IN")) or "Moradabad, UP, IN"
+    typical_lat = profile.typical_lat if profile and profile.typical_lat else 28.8389
+    typical_lon = profile.typical_lon if profile and profile.typical_lon else 78.7768
     avg_amt = profile.avg_amount if profile else 1800.0
 
     now = datetime.datetime.utcnow()
+
+    # Determine effective location from incoming real-time telemetry
+    is_valid_loc = bool(location_name and location_name.strip() and location_name != "Detecting Real Location...")
+    eff_loc = location_name if is_valid_loc else known_loc
+    eff_lat = latitude if (latitude is not None and latitude != 0.0) else typical_lat
+    eff_lon = longitude if (longitude is not None and longitude != 0.0) else typical_lon
 
     if scenario == "normal_coffee":
         payload = TransactionCreate(
@@ -100,9 +107,9 @@ async def trigger_scenario(
             merchant_category="Food & Beverage",
             device_id=known_device,
             ip_address="103.21.124.50",
-            location_name=location_name or known_loc,
-            latitude=latitude if latitude is not None else typical_lat,
-            longitude=longitude if longitude is not None else typical_lon,
+            location_name=eff_loc,
+            latitude=eff_lat,
+            longitude=eff_lon,
             timestamp=timestamp,
             transaction_type="PURCHASE",
             source="SIMULATOR"
@@ -122,6 +129,7 @@ async def trigger_scenario(
             location_name="London, United Kingdom",
             latitude=51.5074,
             longitude=-0.1278,
+            timestamp=timestamp,
             transaction_type="PURCHASE",
             source="SIMULATOR"
         )
@@ -137,9 +145,10 @@ async def trigger_scenario(
             merchant_category="Financial Services",
             device_id=known_device,
             ip_address="103.21.124.50",
-            location_name=known_loc,
-            latitude=typical_lat,
-            longitude=typical_lon,
+            location_name=eff_loc,
+            latitude=eff_lat,
+            longitude=eff_lon,
+            timestamp=timestamp,
             transaction_type="P2P_TRANSFER",
             beneficiary_id="ben_mule_wallet_99",
             source="SIMULATOR"
@@ -198,9 +207,10 @@ async def trigger_scenario(
             merchant_id=f"merch_{merch.lower().replace(' ', '_')}",
             merchant_category=cat,
             device_id=known_device,
-            location_name=known_loc,
-            latitude=typical_lat,
-            longitude=typical_lon,
+            location_name=eff_loc,
+            latitude=eff_lat,
+            longitude=eff_lon,
+            timestamp=timestamp,
             transaction_type="PURCHASE",
             source="SIMULATOR"
         )

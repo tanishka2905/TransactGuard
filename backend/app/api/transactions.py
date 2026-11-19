@@ -70,7 +70,7 @@ async def process_transaction(payload: TransactionCreate, db: Session = Depends(
         amount=payload.amount,
         timestamp=txn_time,
         device_id=payload.device_id,
-        location_name=payload.location_name or "Mumbai, IN",
+        location_name=payload.location_name or "Moradabad, UP, IN",
         latitude=payload.latitude,
         longitude=payload.longitude,
         beneficiary_id=payload.beneficiary_id
@@ -312,9 +312,9 @@ def pre_screen_p2p_transfer(payload: P2PTransferRequest, db: Session = Depends(g
         amount=payload.amount,
         timestamp=now,
         device_id=payload.device_id or (sender.behavior_profile.known_devices[0] if sender.behavior_profile and sender.behavior_profile.known_devices else "dev_web_portal"),
-        location_name=payload.location_name or sender.city or "Mumbai, IN",
-        latitude=payload.latitude if payload.latitude is not None else 19.0760,
-        longitude=payload.longitude if payload.longitude is not None else 72.8777,
+        location_name=payload.location_name or sender.city or "Moradabad, UP, IN",
+        latitude=payload.latitude if payload.latitude is not None else (sender.behavior_profile.typical_lat if sender.behavior_profile and sender.behavior_profile.typical_lat else 28.8389),
+        longitude=payload.longitude if payload.longitude is not None else (sender.behavior_profile.typical_lon if sender.behavior_profile and sender.behavior_profile.typical_lon else 78.7768),
         beneficiary_id=receiver.id
     )
 
@@ -394,9 +394,9 @@ async def execute_p2p_transfer(payload: P2PTransferRequest, db: Session = Depend
     if now.tzinfo is not None:
         now = now.replace(tzinfo=None)
     device_id = payload.device_id or (sender.behavior_profile.known_devices[0] if sender.behavior_profile and sender.behavior_profile.known_devices else "dev_p2p_portal")
-    location_name = payload.location_name or sender.city or "Mumbai, IN"
-    lat = payload.latitude if payload.latitude is not None else (sender.behavior_profile.typical_lat or 19.0760)
-    lon = payload.longitude if payload.longitude is not None else (sender.behavior_profile.typical_lon or 72.8777)
+    location_name = payload.location_name or sender.city or "Moradabad, UP, IN"
+    lat = payload.latitude if payload.latitude is not None else (sender.behavior_profile.typical_lat if sender.behavior_profile and sender.behavior_profile.typical_lat else 28.8389)
+    lon = payload.longitude if payload.longitude is not None else (sender.behavior_profile.typical_lon if sender.behavior_profile and sender.behavior_profile.typical_lon else 78.7768)
 
     # Extract behavioral and contextual features
     features = FeatureExtractor.extract_features(
@@ -652,7 +652,7 @@ def simulate_counterfactual(payload: CounterfactualRequest, db: Session = Depend
                 amount=txn.amount,
                 timestamp=txn.timestamp,
                 device_id=txn.device_id,
-                location_name=txn.location_name or "Mumbai, IN",
+                location_name=txn.location_name or "Moradabad, UP, IN",
                 latitude=txn.latitude,
                 longitude=txn.longitude,
                 beneficiary_id=txn.beneficiary_id
@@ -666,9 +666,9 @@ def simulate_counterfactual(payload: CounterfactualRequest, db: Session = Depend
             amount=payload.amount or 5000.0,
             timestamp=datetime.datetime.utcnow(),
             device_id="dev_apple_iphone15_pro",
-            location_name="Mumbai, IN",
-            latitude=19.076,
-            longitude=72.8777
+            location_name="Moradabad, UP, IN",
+            latitude=28.8389,
+            longitude=78.7768
         )
         orig_score = 25.0
 

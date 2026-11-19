@@ -14,7 +14,7 @@ class User(Base):
     balance = Column(Float, default=100000.0)
     currency = Column(String(16), default="TGX")
     avatar = Column(String(256), nullable=True)
-    city = Column(String(64), default="Mumbai, IN")
+    city = Column(String(64), default="Moradabad, UP, IN")
     account_number = Column(String(32), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -69,7 +69,7 @@ class Transaction(Base):
     ip_address = Column(String(64), nullable=True)
     network_type = Column(String(32), default="Cellular") # Cellular, Broadband, VPN/Tor, Corporate
     
-    location_name = Column(String(64), default="Mumbai, IN")
+    location_name = Column(String(64), default="Moradabad, UP, IN")
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     

@@ -340,6 +340,16 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
             Every transaction is evaluated in real-time across 5 candidate supervised & unsupervised models. The selected Champion model determines the primary fraud probability, while consensus provides explainable cross-validation.
           </p>
 
+          <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-black/40 border border-amber-500/20 text-[11px] font-sans">
+            <span className="text-zinc-300">
+              <strong className="text-amber-400 font-mono">🏆 Why Consensus is #1 Champion: </strong>
+              It combines the votes of all models together so no single algorithm's blind spot can be exploited (scored 100% fraud recall).
+            </span>
+            <span className="text-zinc-400 text-[10px] font-mono">
+              Updates automatically on new data retrains.
+            </span>
+          </div>
+
           {/* Model predictions grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {modelComp?.models && Object.keys(modelComp.models).length > 0 ? (

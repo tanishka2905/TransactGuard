@@ -24,7 +24,7 @@ def list_users(limit: int = 50, db: Session = Depends(get_db)):
             "name": u.name,
             "email": u.email,
             "phone": u.phone or "+91 98000 00000",
-            "city": u.city or "Mumbai, IN",
+            "city": u.city or "Moradabad, UP, IN",
             "balance": round(u.balance if u.balance is not None else 100000.0, 2),
             "currency": u.currency or "TGX",
             "avatar": u.avatar or "".join([w[0].upper() for w in u.name.split()[:2]]),
@@ -35,7 +35,7 @@ def list_users(limit: int = 50, db: Session = Depends(get_db)):
             "total_txns": prof.total_txns if prof else 0,
             "known_devices_count": len(prof.known_devices) if prof and prof.known_devices else 1,
             "known_devices": prof.known_devices if prof and prof.known_devices else ["dev_client_device"],
-            "primary_location": prof.known_locations[0] if prof and prof.known_locations else (u.city or "Mumbai, IN"),
+            "primary_location": prof.known_locations[0] if prof and prof.known_locations else (u.city or "Moradabad, UP, IN"),
             "frequent_beneficiaries": prof.frequent_beneficiaries if prof and prof.frequent_beneficiaries else []
         })
     return results
@@ -61,7 +61,7 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)):
         balance=payload.balance if payload.balance is not None else 100000.0,
         currency=payload.currency or "TGX",
         avatar="".join([w[0].upper() for w in payload.name.split()[:2]]),
-        city=payload.city or "Mumbai, IN",
+        city=payload.city or "Moradabad, UP, IN",
         account_number=f"TGX-{random.randint(1000, 9999)}-{random.randint(1000, 9999)}",
         created_at=now
     )
@@ -80,9 +80,9 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)):
         preferred_hours=list(range(9, 22)),
         night_txn_ratio=0.03,
         known_devices=[device_id],
-        known_locations=[payload.city or "Mumbai, IN"],
-        typical_lat=19.0760,
-        typical_lon=72.8777,
+        known_locations=[payload.city or "Moradabad, UP, IN"],
+        typical_lat=28.8389,
+        typical_lon=78.7768,
         frequent_beneficiaries=[],
         avg_daily_txns=3.0,
         total_txns=0,

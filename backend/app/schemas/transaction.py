@@ -13,7 +13,7 @@ class TransactionBase(BaseModel):
     device_fingerprint: Optional[str] = None
     ip_address: Optional[str] = "103.21.124.50"
     network_type: Optional[str] = "Cellular"
-    location_name: Optional[str] = "Mumbai, IN"
+    location_name: Optional[str] = "Moradabad, UP, IN"
     latitude: Optional[float] = 19.0760
     longitude: Optional[float] = 72.8777
     beneficiary_id: Optional[str] = None
@@ -244,7 +244,7 @@ class UserCreate(BaseModel):
     name: str
     email: str
     phone: Optional[str] = None
-    city: Optional[str] = "Mumbai, IN"
+    city: Optional[str] = "Moradabad, UP, IN"
     balance: Optional[float] = 100000.0
     currency: Optional[str] = "TGX"
     risk_segment: Optional[str] = "LOW"
