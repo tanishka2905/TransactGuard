@@ -193,10 +193,20 @@ export interface CurrencyConfig {
   rateToInr: number;
 }
 
+export interface ModelComparisonRationaleItem {
+  why_chosen?: string;
+  why_not_chosen?: string;
+  strengths?: string[];
+  limitations?: string[];
+  trade_offs?: string;
+}
+
 export interface ModelBenchmark {
   model_id: string;
   name: string;
   category: string;
+  rank?: number;
+  tournament_score?: number;
   accuracy: number;
   precision: number;
   recall: number;
@@ -213,6 +223,11 @@ export interface ModelBenchmark {
   training_time_s: number;
   file: string;
   requires_scaling: boolean;
+  why_chosen?: string;
+  why_not_chosen?: string;
+  strengths?: string[];
+  limitations?: string[];
+  trade_offs?: string;
 }
 
 export interface ModelRegistryResponse {
@@ -220,6 +235,8 @@ export interface ModelRegistryResponse {
   champion_model_id: string;
   champion_model_name: string;
   active_models_count: number;
+  selection_mode?: string;
+  autonomous_champion_reason?: string;
   dataset: {
     total_samples: number;
     train_samples: number;
@@ -228,6 +245,7 @@ export interface ModelRegistryResponse {
     features_count: number;
   };
   leaderboard: ModelBenchmark[];
+  comparison_rationales?: Record<string, ModelComparisonRationaleItem>;
   feature_importances: Record<string, number>;
   feature_columns: string[];
   last_trained_timestamp?: string;
