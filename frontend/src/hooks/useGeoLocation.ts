@@ -19,24 +19,34 @@ export interface GeoLocationState {
 
 // Approximate city resolver based on coordinates fallback (India + global hubs)
 function resolveApproximateCity(lat: number, lon: number): string {
-  // Moradabad / Western UP
-  if (Math.abs(lat - 28.838) < 0.8 && Math.abs(lon - 78.776) < 0.8) return 'Moradabad, UP, IN';
+  // Rudrapur / Pantnagar / Kumaon, Uttarakhand
+  if (Math.abs(lat - 28.980) < 0.35 && Math.abs(lon - 79.410) < 0.35) return 'Rudrapur, Uttarakhand, IN';
+  // Haldwani / Nainital, Uttarakhand
+  if (Math.abs(lat - 29.218) < 0.35 && Math.abs(lon - 79.512) < 0.35) return 'Haldwani, Uttarakhand, IN';
+  // Dehradun, Uttarakhand
+  if (Math.abs(lat - 30.316) < 0.4 && Math.abs(lon - 78.032) < 0.4) return 'Dehradun, Uttarakhand, IN';
+  // Bareilly, UP
+  if (Math.abs(lat - 28.367) < 0.35 && Math.abs(lon - 79.430) < 0.35) return 'Bareilly, UP, IN';
+  // Rampur, UP
+  if (Math.abs(lat - 28.815) < 0.25 && Math.abs(lon - 79.025) < 0.25) return 'Rampur, UP, IN';
+  // Moradabad city proper
+  if (Math.abs(lat - 28.838) < 0.25 && Math.abs(lon - 78.776) < 0.25) return 'Moradabad, UP, IN';
   // Delhi / NCR
-  if (Math.abs(lat - 28.613) < 1.0 && Math.abs(lon - 77.209) < 1.0) return 'New Delhi, IN';
+  if (Math.abs(lat - 28.613) < 0.6 && Math.abs(lon - 77.209) < 0.6) return 'New Delhi, IN';
   // Mumbai
-  if (Math.abs(lat - 19.076) < 1.0 && Math.abs(lon - 72.877) < 1.0) return 'Mumbai, IN';
+  if (Math.abs(lat - 19.076) < 0.6 && Math.abs(lon - 72.877) < 0.6) return 'Mumbai, IN';
   // Bengaluru
-  if (Math.abs(lat - 12.971) < 1.0 && Math.abs(lon - 77.594) < 1.0) return 'Bengaluru, IN';
+  if (Math.abs(lat - 12.971) < 0.6 && Math.abs(lon - 77.594) < 0.6) return 'Bengaluru, IN';
   // Hyderabad
-  if (Math.abs(lat - 17.385) < 1.0 && Math.abs(lon - 78.486) < 1.0) return 'Hyderabad, IN';
+  if (Math.abs(lat - 17.385) < 0.6 && Math.abs(lon - 78.486) < 0.6) return 'Hyderabad, IN';
   // Ahmedabad
-  if (Math.abs(lat - 23.022) < 1.0 && Math.abs(lon - 72.571) < 1.0) return 'Ahmedabad, IN';
+  if (Math.abs(lat - 23.022) < 0.6 && Math.abs(lon - 72.571) < 0.6) return 'Ahmedabad, IN';
   // Chennai
-  if (Math.abs(lat - 13.082) < 1.0 && Math.abs(lon - 80.270) < 1.0) return 'Chennai, IN';
+  if (Math.abs(lat - 13.082) < 0.6 && Math.abs(lon - 80.270) < 0.6) return 'Chennai, IN';
   // Kolkata
-  if (Math.abs(lat - 22.572) < 1.0 && Math.abs(lon - 88.363) < 1.0) return 'Kolkata, IN';
+  if (Math.abs(lat - 22.572) < 0.6 && Math.abs(lon - 88.363) < 0.6) return 'Kolkata, IN';
   // Lucknow
-  if (Math.abs(lat - 26.846) < 1.0 && Math.abs(lon - 80.946) < 1.0) return 'Lucknow, UP, IN';
+  if (Math.abs(lat - 26.846) < 0.6 && Math.abs(lon - 80.946) < 0.6) return 'Lucknow, UP, IN';
   // London
   if (Math.abs(lat - 51.507) < 2.0 && Math.abs(lon - (-0.127)) < 2.0) return 'London, UK';
   // New York
@@ -128,23 +138,20 @@ export function useGeoLocation(): GeoLocationState {
   const reverseGeocode = async (lat: number, lon: number) => {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
       
+      // Strategy 1: BigDataCloud Client Reverse Geocode (100% CORS compliant, no 403, accurate town/locality level)
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`,
-        { 
-          signal: controller.signal,
-          headers: { 'Accept': 'application/json' }
-        }
+        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`,
+        { signal: controller.signal }
       );
       clearTimeout(timeoutId);
 
       if (res.ok) {
         const data = await res.json();
-        const address = data.address || {};
-        const city = address.city || address.town || address.village || address.state_district || address.county;
-        const state = address.state ? `, ${address.state}` : '';
-        const countryCode = (address.country_code || 'in').toUpperCase();
+        const city = data.locality || data.city;
+        const state = data.principalSubdivision ? `, ${data.principalSubdivision}` : '';
+        const countryCode = data.countryCode || 'IN';
         if (city) {
           const formatted = `${city}${state}, ${countryCode}`;
           setCityName(formatted);

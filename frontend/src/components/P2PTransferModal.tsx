@@ -57,6 +57,8 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
   const [preScreenData, setPreScreenData] = useState<P2PPreScreenResult | null>(null);
   const [completedTxn, setCompletedTxn] = useState<Transaction | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isEditingLocation, setIsEditingLocation] = useState(false);
+  const [customCityInput, setCustomCityInput] = useState('');
 
   // Real-time automatic geolocation and temporal telemetry hook
   const geo = useGeoLocation();
@@ -484,7 +486,51 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                   </span>
                   <span className="text-zinc-400">Device Location Telemetry:</span>
-                  <span className="text-emerald-300 font-bold">{geo.cityName}</span>
+                  {isEditingLocation ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={customCityInput}
+                        onChange={(e) => setCustomCityInput(e.target.value)}
+                        placeholder="e.g. Rudrapur, Uttarakhand, IN"
+                        className="px-2 py-0.5 rounded bg-zinc-950 border border-emerald-500/50 text-emerald-300 text-xs font-mono focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (customCityInput.trim()) {
+                            geo.setCustomLocation(customCityInput.trim());
+                            setIsEditingLocation(false);
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold hover:bg-emerald-500/30"
+                      >
+                        Set
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingLocation(false)}
+                        className="text-zinc-500 hover:text-zinc-300 text-[10px] px-1"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-emerald-300 font-bold">{geo.cityName}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomCityInput(geo.cityName);
+                          setIsEditingLocation(true);
+                        }}
+                        title="Manually adjust your city"
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 hover:text-white border border-white/[0.08]"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  )}
                   {geo.latitude !== null && geo.longitude !== null && (
                     <span className="text-zinc-500 text-[11px]">
                       ({geo.latitude.toFixed(4)}°, {geo.longitude.toFixed(4)}°)
@@ -493,7 +539,7 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
                   <button
                     type="button"
                     onClick={() => geo.refresh()}
-                    title="Re-detect live GPS / IP location"
+                    title="Re-detect live device GPS / IP location"
                     className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors ml-1"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${geo.isLoading ? 'animate-spin text-emerald-400' : ''}`} />
