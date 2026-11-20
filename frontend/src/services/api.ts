@@ -290,13 +290,30 @@ export const api = {
     return res.json();
   },
 
-  async verifyStepUpChallenge(txnId: string, challengeType = 'OTP_VERIFICATION'): Promise<Transaction> {
+  async verifyStepUpChallenge(
+    txnId: string, 
+    challengeType: string = 'SECURITY_QUESTION',
+    options?: {
+      securityAnswer?: string;
+      passkeyCredential?: string;
+      verificationCode?: string;
+      analystOverride?: boolean;
+      analystNotes?: string;
+    }
+  ): Promise<Transaction> {
     const res = await fetch(`${API_BASE}/transactions/${txnId}/verify-challenge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ challenge_type: challengeType, verification_code: '123456' })
+      body: JSON.stringify({ 
+        challenge_type: challengeType, 
+        security_answer: options?.securityAnswer,
+        passkey_credential: options?.passkeyCredential,
+        verification_code: options?.verificationCode || '123456',
+        analyst_override: options?.analystOverride || false,
+        analyst_notes: options?.analystNotes
+      })
     });
-    if (!res.ok) throw new Error('Failed to verify step-up challenge');
+    if (!res.ok) throw new Error('Failed to verify adaptive step-up challenge');
     return res.json();
   },
 

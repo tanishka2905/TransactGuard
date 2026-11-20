@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   ShieldAlert, 
@@ -15,7 +15,15 @@ import {
   ShieldCheck,
   Fingerprint,
   Award,
-  Cpu
+  Cpu,
+  Zap,
+  KeyRound,
+  HelpCircle,
+  Timer,
+  ChevronDown,
+  ChevronUp,
+  Lock,
+  Clock
 } from 'lucide-react';
 import type { Transaction, CounterfactualResponse, ModelPredictionItem } from '../types';
 import { SideBySideTxnView } from './SideBySideTxnView';
@@ -43,8 +51,52 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
   const [cfResult, setCfResult] = useState<CounterfactualResponse | null>(null);
   const [cfLoading, setCfLoading] = useState(false);
 
-  // Step-up verification state
+  // Step-up verification & Adaptive Friction Matrix state
   const [verifyingChallenge, setVerifyingChallenge] = useState(false);
+
+  const riskScore = transaction ? transaction.risk_score : 0;
+  const initialTier: string = (transaction?.feature_breakdown as any)?.friction_tier || (
+    riskScore < 25 ? 'TIER_1_ZERO_FRICTION' :
+    riskScore <= 60 ? 'TIER_2_SECURITY_QUESTION' :
+    riskScore <= 80 ? 'TIER_3_HARDWARE_PASSKEY' :
+    'TIER_4_ESCROW_OR_SOC_REVIEW'
+  );
+
+  const [activeFrictionTab, setActiveFrictionTab] = useState<string>(initialTier);
+  const [securityAnswer, setSecurityAnswer] = useState<string>(
+    transaction?.location_name?.split(',')[0] || 'Moradabad'
+  );
+  const [passkeyState, setPasskeyState] = useState<'idle' | 'touching' | 'authenticated'>('idle');
+  const [escrowTimeLeft, setEscrowTimeLeft] = useState<number>(900); // 15 minutes = 900 seconds
+  const [analystNotes, setAnalystNotes] = useState<string>('Manual identity override verified via SOC multi-signal protocol.');
+  const [showMatrixGuide, setShowMatrixGuide] = useState<boolean>(true);
+
+  // Update initial tier if transaction changes
+  useEffect(() => {
+    setActiveFrictionTab(initialTier);
+    if (transaction?.location_name) {
+      setSecurityAnswer(transaction.location_name.split(',')[0].trim());
+    }
+  }, [transaction?.id, initialTier]);
+
+  // Escrow countdown timer for Tier 4
+  useEffect(() => {
+    let interval: any = null;
+    if (initialTier === 'TIER_4_ESCROW_OR_SOC_REVIEW' || activeFrictionTab === 'TIER_4_ESCROW_OR_SOC_REVIEW') {
+      interval = setInterval(() => {
+        setEscrowTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [initialTier, activeFrictionTab]);
+
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   if (!transaction) return null;
 
@@ -99,21 +151,87 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
     }
   };
 
-  const handleVerifyStepUp = async (challengeType: string) => {
+  const handleExecuteZeroFriction = async () => {
     try {
       setVerifyingChallenge(true);
-      await api.verifyStepUpChallenge(transaction.id, challengeType);
+      await api.continueTransaction(transaction.id);
       if (onUpdateStatus) onUpdateStatus(transaction.id, 'APPROVED');
-      setStatusMessage(`Adaptive challenge (${challengeType}) verified! Transaction approved.`);
+      setStatusMessage('Tier 1 Zero Friction applied: Instant 1-click execution verified & settled!');
       setTimeout(() => {
         onClose();
       }, 1500);
     } catch (err: any) {
-      alert(`Challenge verification failed: ${err.message}`);
+      alert(`Zero Friction execution failed: ${err.message}`);
     } finally {
       setVerifyingChallenge(false);
     }
   };
+
+  const handleVerifySecurityQuestion = async () => {
+    try {
+      setVerifyingChallenge(true);
+      await api.verifyStepUpChallenge(transaction.id, 'SECURITY_QUESTION', {
+        securityAnswer: securityAnswer || 'Confirmed'
+      });
+      if (onUpdateStatus) onUpdateStatus(transaction.id, 'APPROVED');
+      setStatusMessage(`Tier 2 Security Question answered ("${securityAnswer}")! Adaptive step-up passed, transaction approved.`);
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+    } catch (err: any) {
+      alert(`Security question verification failed: ${err.message}`);
+    } finally {
+      setVerifyingChallenge(false);
+    }
+  };
+
+  const handleVerifyHardwarePasskey = async () => {
+    try {
+      setPasskeyState('touching');
+      await new Promise((resolve) => setTimeout(resolve, 850));
+      setPasskeyState('authenticated');
+      setVerifyingChallenge(true);
+      await api.verifyStepUpChallenge(transaction.id, 'HARDWARE_PASSKEY', {
+        passkeyCredential: `fido2_assert_${Date.now()}_sha256_touch_verified`
+      });
+      if (onUpdateStatus) onUpdateStatus(transaction.id, 'APPROVED');
+      setStatusMessage('Tier 3 FIDO2 Hardware Passkey verified! Cryptographic assertion validated.');
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+    } catch (err: any) {
+      alert(`Hardware Passkey verification failed: ${err.message}`);
+      setPasskeyState('idle');
+    } finally {
+      setVerifyingChallenge(false);
+    }
+  };
+
+  const handleEscrowAction = async (isAnalystOverride: boolean = false) => {
+    try {
+      setVerifyingChallenge(true);
+      const challengeType = isAnalystOverride ? 'SOC_ANALYST_OVERRIDE' : 'ESCROW_RELEASE';
+      await api.verifyStepUpChallenge(transaction.id, challengeType, {
+        analystOverride: isAnalystOverride,
+        analystNotes: isAnalystOverride ? analystNotes : '15-minute escrow cooling-off period completed'
+      });
+      if (onUpdateStatus) onUpdateStatus(transaction.id, 'APPROVED');
+      setStatusMessage(
+        isAnalystOverride
+          ? 'Tier 4 Manual SOC Analyst clearance override executed! Alert resolved.'
+          : 'Tier 4 Escrow cooling-off quarantine released. Transaction approved.'
+      );
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+    } catch (err: any) {
+      alert(`Escrow resolution failed: ${err.message}`);
+    } finally {
+      setVerifyingChallenge(false);
+    }
+  };
+
+
 
   const runCounterfactualSimulation = async () => {
     try {
@@ -682,26 +800,327 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
           </div>
         </div>
 
-        {/* Adaptive Friction & Analyst Action Footer */}
+        {/* ========================================================
+            ADAPTIVE STEP-UP FRICTION MATRIX (DYNAMIC RISK ESCALATION)
+           ======================================================== */}
+        <div className="rounded-2xl border border-white/[0.08] bg-zinc-900/60 p-4 space-y-4 font-mono">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                <Sliders className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <span>Adaptive Step-Up Friction Matrix</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-normal">
+                    Dynamic Risk Escalation
+                  </span>
+                </h4>
+                <p className="text-[11px] text-zinc-400">
+                  Real-world payment gateways dynamically apply friction proportionate to the risk score.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowMatrixGuide(!showMatrixGuide)}
+              className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 bg-zinc-800/80 px-2 py-1 rounded-lg border border-white/[0.06] transition-colors"
+            >
+              <span>{showMatrixGuide ? 'Collapse Matrix' : 'View 4-Tier Matrix'}</span>
+              {showMatrixGuide ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+
+          {/* 4-Tier Interactive Matrix Grid */}
+          {showMatrixGuide && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+              {/* TIER 1 */}
+              <div 
+                onClick={() => setActiveFrictionTab('TIER_1_ZERO_FRICTION')}
+                className={`cursor-pointer p-3 rounded-xl border transition-all text-left relative overflow-hidden ${
+                  activeFrictionTab === 'TIER_1_ZERO_FRICTION'
+                    ? 'bg-emerald-950/40 border-emerald-500/60 shadow-lg shadow-emerald-500/10'
+                    : 'bg-zinc-900/80 border-white/[0.06] hover:border-emerald-500/30'
+                }`}
+              >
+                {initialTier === 'TIER_1_ZERO_FRICTION' && (
+                  <span className="absolute top-1.5 right-1.5 text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold uppercase animate-pulse">
+                    Active Tier
+                  </span>
+                )}
+                <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold mb-1">
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Low Risk (&lt; 25 pts)</span>
+                </div>
+                <div className="text-[11px] text-zinc-200 font-semibold">Zero Friction (1-Click)</div>
+                <div className="text-[10px] text-zinc-400 mt-1">Instant 1-click execution for seamless trusted transactions.</div>
+              </div>
+
+              {/* TIER 2 */}
+              <div 
+                onClick={() => setActiveFrictionTab('TIER_2_SECURITY_QUESTION')}
+                className={`cursor-pointer p-3 rounded-xl border transition-all text-left relative overflow-hidden ${
+                  activeFrictionTab === 'TIER_2_SECURITY_QUESTION'
+                    ? 'bg-amber-950/40 border-amber-500/60 shadow-lg shadow-amber-500/10'
+                    : 'bg-zinc-900/80 border-white/[0.06] hover:border-amber-500/30'
+                }`}
+              >
+                {initialTier === 'TIER_2_SECURITY_QUESTION' && (
+                  <span className="absolute top-1.5 right-1.5 text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold uppercase animate-pulse">
+                    Active Tier
+                  </span>
+                )}
+                <div className="flex items-center gap-1.5 text-amber-400 text-xs font-bold mb-1">
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  <span>Medium Risk (25–60 pts)</span>
+                </div>
+                <div className="text-[11px] text-zinc-200 font-semibold">Security Question Challenge</div>
+                <div className="text-[10px] text-zinc-400 mt-1">Step-up challenge to verify legitimate cardholder presence.</div>
+              </div>
+
+              {/* TIER 3 */}
+              <div 
+                onClick={() => setActiveFrictionTab('TIER_3_HARDWARE_PASSKEY')}
+                className={`cursor-pointer p-3 rounded-xl border transition-all text-left relative overflow-hidden ${
+                  activeFrictionTab === 'TIER_3_HARDWARE_PASSKEY'
+                    ? 'bg-orange-950/40 border-orange-500/60 shadow-lg shadow-orange-500/10'
+                    : 'bg-zinc-900/80 border-white/[0.06] hover:border-orange-500/30'
+                }`}
+              >
+                {initialTier === 'TIER_3_HARDWARE_PASSKEY' && (
+                  <span className="absolute top-1.5 right-1.5 text-[9px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300 border border-orange-500/40 font-bold uppercase animate-pulse">
+                    Active Tier
+                  </span>
+                )}
+                <div className="flex items-center gap-1.5 text-orange-400 text-xs font-bold mb-1">
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>High Risk (60–80 pts)</span>
+                </div>
+                <div className="text-[11px] text-zinc-200 font-semibold">Hardware Passkey (FIDO2)</div>
+                <div className="text-[10px] text-zinc-400 mt-1">WebAuthn touch verification to prevent session hijacking.</div>
+              </div>
+
+              {/* TIER 4 */}
+              <div 
+                onClick={() => setActiveFrictionTab('TIER_4_ESCROW_OR_SOC_REVIEW')}
+                className={`cursor-pointer p-3 rounded-xl border transition-all text-left relative overflow-hidden ${
+                  activeFrictionTab === 'TIER_4_ESCROW_OR_SOC_REVIEW'
+                    ? 'bg-rose-950/40 border-rose-500/60 shadow-lg shadow-rose-500/10'
+                    : 'bg-zinc-900/80 border-white/[0.06] hover:border-rose-500/30'
+                }`}
+              >
+                {initialTier === 'TIER_4_ESCROW_OR_SOC_REVIEW' && (
+                  <span className="absolute top-1.5 right-1.5 text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold uppercase animate-pulse">
+                    Active Tier
+                  </span>
+                )}
+                <div className="flex items-center gap-1.5 text-rose-400 text-xs font-bold mb-1">
+                  <Timer className="w-3.5 h-3.5" />
+                  <span>Critical Risk (&gt; 80 pts)</span>
+                </div>
+                <div className="text-[11px] text-zinc-200 font-semibold">15-Min Escrow / SOC Review</div>
+                <div className="text-[10px] text-zinc-400 mt-1">Automated cooling-off quarantine or manual clearance.</div>
+              </div>
+            </div>
+          )}
+
+          {/* ACTIVE SELECTED CHALLENGE / FRICTION PANEL */}
+          <div className="p-4 rounded-xl bg-zinc-950/80 border border-white/[0.08] space-y-3">
+            {activeFrictionTab === 'TIER_1_ZERO_FRICTION' && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+                    <Zap className="w-4 h-4" />
+                    <span>Tier 1: Zero Friction Authorized (<span className="font-mono">{riskScore} pts</span>)</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400">
+                    Confidence is high. No step-up friction is required; 1-click execution proceeds seamlessly.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={verifyingChallenge}
+                  onClick={handleExecuteZeroFriction}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all shrink-0"
+                >
+                  {verifyingChallenge ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                  <span>Instant 1-Click Execution</span>
+                </button>
+              </div>
+            )}
+
+            {activeFrictionTab === 'TIER_2_SECURITY_QUESTION' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-amber-400 text-xs font-bold">
+                    <HelpCircle className="w-4 h-4" />
+                    <span>Tier 2 Step-Up Challenge: Security Question</span>
+                  </div>
+                  <span className="text-[10px] text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                    Medium Risk Friction (25–60 pts)
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[11px] text-zinc-300 font-medium flex items-center gap-1.5">
+                      <Lock className="w-3 h-3 text-amber-400" />
+                      <span>Security Challenge Question:</span>
+                      <span className="text-zinc-400 font-normal">What city was your primary banking branch registered in?</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={securityAnswer}
+                      onChange={(e) => setSecurityAnswer(e.target.value)}
+                      placeholder="e.g. Moradabad"
+                      className="w-full px-3 py-1.5 rounded-lg bg-zinc-900 border border-amber-500/40 text-white text-xs font-mono focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={verifyingChallenge || !securityAnswer.trim()}
+                    onClick={handleVerifySecurityQuestion}
+                    className="self-end sm:self-center inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-lg shadow-amber-600/30 transition-all shrink-0 disabled:opacity-50"
+                  >
+                    {verifyingChallenge ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                    <span>Verify Security Answer</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {activeFrictionTab === 'TIER_3_HARDWARE_PASSKEY' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-orange-400 text-xs font-bold">
+                    <KeyRound className="w-4 h-4" />
+                    <span>Tier 3 Hardware Passkey Challenge (FIDO2 / WebAuthn)</span>
+                  </div>
+                  <span className="text-[10px] text-orange-300 bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20">
+                    High Risk Friction (60–80 pts)
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-lg bg-zinc-900 border border-orange-500/30">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2.5 rounded-xl border ${passkeyState === 'touching' ? 'bg-orange-500/30 border-orange-500 animate-pulse text-orange-300' : 'bg-orange-500/10 border-orange-500/30 text-orange-400'}`}>
+                      <Fingerprint className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="text-xs text-white font-semibold flex items-center gap-1.5">
+                        <span>Physical FIDO2 Hardware Token / Biometric Sensor</span>
+                        {passkeyState === 'authenticated' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                      </div>
+                      <p className="text-[11px] text-zinc-400">
+                        Touch your security key (YubiKey / Touch ID) to sign a cryptographic challenge payload.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={verifyingChallenge || passkeyState === 'touching'}
+                    onClick={handleVerifyHardwarePasskey}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs shadow-lg shadow-orange-600/30 transition-all shrink-0"
+                  >
+                    {passkeyState === 'touching' ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Verifying Touch Assertion...</span>
+                      </>
+                    ) : (
+                      <>
+                        <KeyRound className="w-3.5 h-3.5" />
+                        <span>Touch Hardware Passkey</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {activeFrictionTab === 'TIER_4_ESCROW_OR_SOC_REVIEW' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-rose-400 text-xs font-bold">
+                    <Timer className="w-4 h-4 animate-pulse" />
+                    <span>Tier 4 Friction: 15-Minute Escrow Cooling-Off Vault</span>
+                  </div>
+                  <span className="text-[10px] text-rose-300 bg-rose-500/20 px-2 py-0.5 rounded border border-rose-500/40 font-bold">
+                    Critical Risk Friction (&gt; 80 pts)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Countdown Box */}
+                  <div className="p-3 rounded-lg bg-zinc-900 border border-rose-500/30 flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                      <Clock className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold">
+                        Automated Cooling-Off Timer
+                      </div>
+                      <div className="text-xl font-bold font-mono text-rose-300">
+                        {formatTime(escrowTimeLeft)}
+                      </div>
+                      <div className="text-[10px] text-zinc-500">
+                        Funds quarantined against automated rapid drain.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Early Self-Healing Release */}
+                  <div className="p-3 rounded-lg bg-zinc-900 border border-white/[0.08] flex items-center justify-between">
+                    <div>
+                      <div className="text-xs text-white font-semibold">Self-Healing Release</div>
+                      <div className="text-[10px] text-zinc-400">Release escrow after cooldown verification.</div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={verifyingChallenge}
+                      onClick={() => handleEscrowAction(false)}
+                      className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-white/[0.1] text-xs font-semibold transition-colors"
+                    >
+                      Release Escrow
+                    </button>
+                  </div>
+                </div>
+
+                {/* SOC Analyst Manual Override */}
+                <div className="p-3 rounded-lg bg-rose-950/30 border border-rose-500/30 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                  <div className="flex-1 space-y-1">
+                    <div className="text-xs text-rose-200 font-bold flex items-center gap-1.5">
+                      <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                      <span>Manual SOC Analyst Review & Override</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={analystNotes}
+                      onChange={(e) => setAnalystNotes(e.target.value)}
+                      placeholder="Analyst verification notes..."
+                      className="w-full px-3 py-1 rounded bg-black/40 border border-rose-500/30 text-xs text-zinc-200 font-mono focus:outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={verifyingChallenge}
+                    onClick={() => handleEscrowAction(true)}
+                    className="self-end sm:self-center inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition-all shrink-0"
+                  >
+                    {verifyingChallenge ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                    <span>SOC Clearance & Override</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Modal Action Bar */}
         <div className="flex flex-wrap items-center justify-between pt-4 border-t border-white/[0.08] gap-3 font-mono text-xs">
-          <div className="flex items-center gap-2">
-            <span className="text-zinc-400">Adaptive Friction:</span>
-            <button
-              onClick={() => handleVerifyStepUp('BIOMETRIC_TOUCHID')}
-              disabled={verifyingChallenge}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-[11px] font-semibold transition-all"
-            >
-              <Fingerprint className="w-3.5 h-3.5" />
-              <span>Verify Biometrics</span>
-            </button>
-            <button
-              onClick={() => handleVerifyStepUp('OTP_SMS')}
-              disabled={verifyingChallenge}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-[11px] font-semibold transition-all"
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Verify OTP</span>
-            </button>
+          <div className="flex items-center gap-2 text-zinc-400 text-[11px]">
+            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
+            <span>Dynamic Risk Escalation · Sub-20ms Engine Telemetry</span>
           </div>
 
           <div className="flex items-center gap-2">

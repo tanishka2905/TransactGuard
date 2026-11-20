@@ -106,9 +106,12 @@ class CounterfactualResponse(BaseModel):
     feature_breakdown: Dict[str, Any]
 
 class VerifyChallengeRequest(BaseModel):
-    challenge_type: str = "OTP_VERIFICATION"
-    verification_code: str = "123456"
+    challenge_type: str = "SECURITY_QUESTION"  # SECURITY_QUESTION, HARDWARE_PASSKEY, ESCROW_RELEASE, SOC_ANALYST_OVERRIDE, OTP_VERIFICATION
+    security_answer: Optional[str] = None
+    passkey_credential: Optional[str] = None
+    verification_code: Optional[str] = "123456"
     analyst_override: bool = False
+    analyst_notes: Optional[str] = None
 
 class AlertUpdate(BaseModel):
     status: str # NEW, REVIEWING, RESOLVED, FALSE_POSITIVE, CONFIRMED_FRAUD
@@ -157,9 +160,12 @@ class CounterfactualResponse(BaseModel):
     feature_breakdown: Dict[str, Any]
 
 class VerifyChallengeRequest(BaseModel):
-    challenge_type: str = "OTP_VERIFICATION"
-    verification_code: str = "123456"
+    challenge_type: str = "SECURITY_QUESTION"  # SECURITY_QUESTION, HARDWARE_PASSKEY, ESCROW_RELEASE, SOC_ANALYST_OVERRIDE, OTP_VERIFICATION
+    security_answer: Optional[str] = None
+    passkey_credential: Optional[str] = None
+    verification_code: Optional[str] = "123456"
     analyst_override: bool = False
+    analyst_notes: Optional[str] = None
 
 class UserBehaviorProfileSchema(BaseModel):
     user_id: str
@@ -238,6 +244,11 @@ class P2PPreScreenResponse(BaseModel):
     is_new_beneficiary: bool
     sender_city: str
     receiver_city: str
+    friction_tier: Optional[str] = "TIER_1_ZERO_FRICTION"
+    challenge_type: Optional[str] = "NONE"
+    recommended_action: Optional[str] = "ZERO_FRICTION_EXECUTION"
+    escrow_until: Optional[str] = None
+    security_question: Optional[str] = None
 
 class UserCreate(BaseModel):
     id: str
@@ -294,6 +305,9 @@ class CounterfactualResponse(BaseModel):
     feature_breakdown: Dict[str, Any]
 
 class VerifyChallengeRequest(BaseModel):
-    challenge_type: str = "OTP_VERIFICATION"
-    verification_code: str = "123456"
+    challenge_type: str = "SECURITY_QUESTION"  # SECURITY_QUESTION, HARDWARE_PASSKEY, ESCROW_RELEASE, SOC_ANALYST_OVERRIDE, OTP_VERIFICATION
+    security_answer: Optional[str] = None
+    passkey_credential: Optional[str] = None
+    verification_code: Optional[str] = "123456"
     analyst_override: bool = False
+    analyst_notes: Optional[str] = None

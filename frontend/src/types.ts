@@ -2,6 +2,21 @@ export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type TransactionStatus = 'APPROVED' | 'FLAGGED' | 'BLOCKED';
 export type AlertStatus = 'NEW' | 'REVIEWING' | 'RESOLVED' | 'FALSE_POSITIVE' | 'CONFIRMED_FRAUD' | 'RESOLVED_CONFIRMED_GENUINE';
 
+export type FrictionTier = 
+  | 'TIER_1_ZERO_FRICTION' 
+  | 'TIER_2_SECURITY_QUESTION' 
+  | 'TIER_3_HARDWARE_PASSKEY' 
+  | 'TIER_4_ESCROW_OR_SOC_REVIEW';
+
+export type ChallengeType = 
+  | 'NONE' 
+  | 'SECURITY_QUESTION' 
+  | 'HARDWARE_PASSKEY' 
+  | 'ESCROW_COOLING_OFF'
+  | 'SOC_ANALYST_OVERRIDE'
+  | 'OTP_VERIFICATION'
+  | 'BIOMETRIC_STEP_UP';
+
 export interface ModelPredictionItem {
   name: string;
   probability: number;
@@ -39,6 +54,11 @@ export interface FeatureBreakdown {
   p2p_sender?: any;
   p2p_receiver?: any;
   model_comparison?: ModelComparisonData;
+  friction_tier?: FrictionTier;
+  friction_description?: string;
+  challenge_type?: ChallengeType;
+  recommended_action?: string;
+  escrow_until?: string;
 }
 
 export interface Transaction {
@@ -184,6 +204,11 @@ export interface P2PPreScreenResult {
   is_new_beneficiary: boolean;
   sender_city: string;
   receiver_city: string;
+  friction_tier?: FrictionTier;
+  challenge_type?: ChallengeType;
+  recommended_action?: string;
+  escrow_until?: string;
+  security_question?: string;
 }
 
 export interface CurrencyConfig {
