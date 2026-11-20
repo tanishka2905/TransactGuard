@@ -36,6 +36,8 @@ def list_users(limit: int = 50, db: Session = Depends(get_db)):
             "known_devices_count": len(prof.known_devices) if prof and prof.known_devices else 1,
             "known_devices": prof.known_devices if prof and prof.known_devices else ["dev_client_device"],
             "primary_location": prof.known_locations[0] if prof and prof.known_locations else (u.city or "Moradabad, UP, IN"),
+            "security_question": u.security_question or "What city was your primary banking branch registered in?",
+            "security_answer": u.security_answer or (u.city.split(',')[0].strip() if u.city else "Moradabad"),
             "frequent_beneficiaries": prof.frequent_beneficiaries if prof and prof.frequent_beneficiaries else []
         })
     return results
@@ -52,6 +54,9 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="User with this email already exists")
 
     now = datetime.datetime.utcnow()
+    sec_q = payload.security_question or "What city was your primary banking branch registered in?"
+    sec_a = payload.security_answer or (payload.city.split(',')[0].strip() if payload.city else "Moradabad")
+
     user = User(
         id=payload.id,
         name=payload.name,
@@ -63,6 +68,8 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)):
         avatar="".join([w[0].upper() for w in payload.name.split()[:2]]),
         city=payload.city or "Moradabad, UP, IN",
         account_number=f"TGX-{random.randint(1000, 9999)}-{random.randint(1000, 9999)}",
+        security_question=sec_q,
+        security_answer=sec_a,
         created_at=now
     )
     db.add(user)
@@ -102,7 +109,9 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)):
         "currency": user.currency,
         "avatar": user.avatar,
         "account_number": user.account_number,
-        "risk_segment": user.risk_segment
+        "risk_segment": user.risk_segment,
+        "security_question": user.security_question,
+        "security_answer": user.security_answer
     }
 
 @router.get("/{user_id}/profile", response_model=UserBehaviorProfileSchema)

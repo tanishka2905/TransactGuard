@@ -63,9 +63,9 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
   );
 
   const [activeFrictionTab, setActiveFrictionTab] = useState<string>(initialTier);
-  const [securityAnswer, setSecurityAnswer] = useState<string>(
-    transaction?.location_name?.split(',')[0] || 'Moradabad'
-  );
+  const [securityAnswer, setSecurityAnswer] = useState<string>('');
+  const [qaError, setQaError] = useState<string | null>(null);
+  const [qaSuccess, setQaSuccess] = useState<string | null>(null);
   const [passkeyState, setPasskeyState] = useState<'idle' | 'touching' | 'authenticated'>('idle');
   const [escrowTimeLeft, setEscrowTimeLeft] = useState<number>(900); // 15 minutes = 900 seconds
   const [analystNotes, setAnalystNotes] = useState<string>('Manual identity override verified via SOC multi-signal protocol.');
@@ -74,9 +74,9 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
   // Update initial tier if transaction changes
   useEffect(() => {
     setActiveFrictionTab(initialTier);
-    if (transaction?.location_name) {
-      setSecurityAnswer(transaction.location_name.split(',')[0].trim());
-    }
+    setSecurityAnswer('');
+    setQaError(null);
+    setQaSuccess(null);
   }, [transaction?.id, initialTier]);
 
   // Escrow countdown timer for Tier 4
@@ -168,18 +168,25 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
   };
 
   const handleVerifySecurityQuestion = async () => {
+    if (!securityAnswer.trim()) {
+      setQaError('Please type your registered security answer.');
+      return;
+    }
+    setQaError(null);
+    setQaSuccess(null);
     try {
       setVerifyingChallenge(true);
       await api.verifyStepUpChallenge(transaction.id, 'SECURITY_QUESTION', {
-        securityAnswer: securityAnswer || 'Confirmed'
+        securityAnswer: securityAnswer.trim()
       });
       if (onUpdateStatus) onUpdateStatus(transaction.id, 'APPROVED');
-      setStatusMessage(`Tier 2 Security Question answered ("${securityAnswer}")! Adaptive step-up passed, transaction approved.`);
+      setQaSuccess(`✓ Security answer verified! Identity matched against registered profile. Access granted & transaction approved.`);
+      setStatusMessage(`Tier 2 Security Question verified ("${securityAnswer}")! Adaptive step-up passed, access granted.`);
       setTimeout(() => {
         onClose();
-      }, 1500);
+      }, 1600);
     } catch (err: any) {
-      alert(`Security question verification failed: ${err.message}`);
+      setQaError(err.message || 'Security verification failed: Incorrect answer. Access denied.');
     } finally {
       setVerifyingChallenge(false);
     }
@@ -974,13 +981,18 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
                     <label className="text-[11px] text-zinc-300 font-medium flex items-center gap-1.5">
                       <Lock className="w-3 h-3 text-amber-400" />
                       <span>Security Challenge Question:</span>
-                      <span className="text-zinc-400 font-normal">What city was your primary banking branch registered in?</span>
+                      <span className="text-zinc-200 font-semibold">
+                        {(transaction?.feature_breakdown as any)?.security_question || "What city was your primary banking branch registered in?"}
+                      </span>
                     </label>
                     <input
                       type="text"
                       value={securityAnswer}
-                      onChange={(e) => setSecurityAnswer(e.target.value)}
-                      placeholder="e.g. Moradabad"
+                      onChange={(e) => {
+                        setSecurityAnswer(e.target.value);
+                        setQaError(null);
+                      }}
+                      placeholder="Type the secret answer you configured during registration/login..."
                       className="w-full px-3 py-1.5 rounded-lg bg-zinc-900 border border-amber-500/40 text-white text-xs font-mono focus:outline-none focus:border-amber-400"
                     />
                   </div>
@@ -994,6 +1006,20 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
                     <span>Verify Security Answer</span>
                   </button>
                 </div>
+
+                {qaError && (
+                  <div className="p-2.5 rounded-xl bg-rose-950/50 border border-rose-500/40 text-rose-300 text-xs font-mono flex items-center gap-2 animate-fadeIn">
+                    <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>{qaError}</span>
+                  </div>
+                )}
+
+                {qaSuccess && (
+                  <div className="p-2.5 rounded-xl bg-emerald-950/50 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center gap-2 animate-fadeIn">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>{qaSuccess}</span>
+                  </div>
+                )}
               </div>
             )}
 

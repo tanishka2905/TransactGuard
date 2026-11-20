@@ -6,7 +6,9 @@ import {
   ArrowRight, 
   RefreshCw, 
   Coins, 
-  History 
+  History,
+  KeyRound,
+  Lock
 } from 'lucide-react';
 import type { UserSummary, Transaction, CurrencyConfig } from '../types';
 import { api } from '../services/api';
@@ -29,6 +31,8 @@ export const MultiUserView: React.FC<MultiUserViewProps> = ({
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserCity, setNewUserCity] = useState('Moradabad, UP, IN');
   const [newUserBalance, setNewUserBalance] = useState('100000');
+  const [newUserQuestion, setNewUserQuestion] = useState('What city was your primary banking branch registered in?');
+  const [newUserAnswer, setNewUserAnswer] = useState('Moradabad');
   const [currencyConfig, setCurrencyConfig] = useState<CurrencyConfig>(getStoredCurrency());
   const [depositUserId, setDepositUserId] = useState<string | null>(null);
   const [depositAmount, setDepositAmount] = useState('25000');
@@ -77,10 +81,13 @@ export const MultiUserView: React.FC<MultiUserViewProps> = ({
         city: newUserCity,
         balance: parseFloat(newUserBalance) || 50000,
         currency: currencyConfig.code,
+        security_question: newUserQuestion,
+        security_answer: newUserAnswer.trim(),
       });
       setIsAddingUser(false);
       setNewUserName('');
       setNewUserEmail('');
+      setNewUserAnswer('Moradabad');
       loadData();
     } catch (err: any) {
       alert(err.message || 'Failed to create user');
@@ -187,7 +194,12 @@ export const MultiUserView: React.FC<MultiUserViewProps> = ({
                   <input
                     type="text"
                     value={newUserCity}
-                    onChange={(e) => setNewUserCity(e.target.value)}
+                    onChange={(e) => {
+                      setNewUserCity(e.target.value);
+                      if (!newUserAnswer || newUserAnswer === 'Moradabad') {
+                        setNewUserAnswer(e.target.value.split(',')[0].trim());
+                      }
+                    }}
                     placeholder="Mumbai, IN"
                     className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-white/[0.1] text-white font-mono text-xs focus:outline-none focus:border-indigo-500/60"
                   />
@@ -201,6 +213,61 @@ export const MultiUserView: React.FC<MultiUserViewProps> = ({
                     placeholder="100000"
                     className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-white/[0.1] text-white font-mono text-xs focus:outline-none focus:border-indigo-500/60"
                   />
+                </div>
+              </div>
+
+              {/* Security Question & Answer (Used for Adaptive Step-Up Challenges) */}
+              <div className="p-3.5 rounded-xl bg-zinc-900/90 border border-amber-500/30 space-y-3">
+                <div className="flex items-center gap-2 text-xs font-mono font-bold text-amber-300">
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>Adaptive Friction Security Verification</span>
+                </div>
+                <p className="text-[11px] font-mono text-zinc-400">
+                  Configure the security challenge question and secret answer used to recheck identity when medium or high risk transactions occur.
+                </p>
+
+                <div>
+                  <label className="block text-[11px] font-mono text-zinc-300 mb-1">
+                    Select Security Question
+                  </label>
+                  <select
+                    value={newUserQuestion}
+                    onChange={(e) => setNewUserQuestion(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-white/[0.1] text-white font-mono text-xs focus:outline-none focus:border-amber-500/60"
+                  >
+                    <option value="What city was your primary banking branch registered in?">
+                      What city was your primary banking branch registered in?
+                    </option>
+                    <option value="What was the name of your first elementary or high school?">
+                      What was the name of your first elementary or high school?
+                    </option>
+                    <option value="What was the brand or model of your first car or computer?">
+                      What was the brand or model of your first car or computer?
+                    </option>
+                    <option value="What is your maternal grandmother or mother's birthplace?">
+                      What is your maternal grandmother or mother's birthplace?
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-mono text-zinc-300 mb-1">
+                    Secret Security Answer (Rechecked on Step-Up)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      value={newUserAnswer}
+                      onChange={(e) => setNewUserAnswer(e.target.value)}
+                      placeholder="e.g. Kaladhungi or Moradabad"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-amber-500/40 text-white font-mono text-xs focus:outline-none focus:border-amber-400"
+                    />
+                    <Lock className="w-3.5 h-3.5 text-amber-400 absolute right-3 top-2.5 pointer-events-none" />
+                  </div>
+                  <span className="text-[10px] text-zinc-500 font-mono mt-1 block">
+                    Access is only granted when the answer entered on step-up matches this registered value.
+                  </span>
                 </div>
               </div>
 
@@ -275,6 +342,23 @@ export const MultiUserView: React.FC<MultiUserViewProps> = ({
                 <div className="flex items-center justify-between">
                   <span>Known Devices:</span>
                   <span className="text-zinc-200">{user.known_devices_count} active</span>
+                </div>
+                <div className="pt-1.5 mt-1 border-t border-white/[0.04]">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-amber-400/90 flex items-center gap-1">
+                      <KeyRound className="w-3 h-3" />
+                      Security Q:
+                    </span>
+                    <span className="text-zinc-300 truncate max-w-[140px]" title={user.security_question}>
+                      {user.security_question ? user.security_question.slice(0, 20) + '...' : 'Branch City'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] mt-0.5">
+                    <span className="text-zinc-500">Verified Answer:</span>
+                    <span className="text-emerald-300 font-mono font-semibold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                      {user.security_answer || (user.city ? user.city.split(',')[0].trim() : 'Moradabad')}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
