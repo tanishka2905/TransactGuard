@@ -16,11 +16,14 @@ import {
   Radio, 
   TrendingUp, 
   Layers,
-  Send
+  Send,
+  MapPin,
+  Clock
 } from 'lucide-react';
 import type { DashboardMetrics, Transaction } from '../types';
 import { MetricCards } from '../components/MetricCards';
 import { LiveTable } from '../components/LiveTable';
+import { useGeoLocation } from '../hooks/useGeoLocation';
 
 interface DashboardViewProps {
   metrics: DashboardMetrics | null;
@@ -37,6 +40,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenSimulator,
   onOpenTransfer,
 }) => {
+  const geo = useGeoLocation();
   // Fallback / formatted chart data
   const hourlyData = metrics?.hourly_volume && metrics.hourly_volume.length > 0
     ? metrics.hourly_volume
@@ -82,7 +86,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Real-time Location & Clock Telemetry Badge */}
+          <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-zinc-950/80 border border-white/[0.08] text-xs font-mono shadow-sm">
+            <div className="flex items-center gap-1.5 text-zinc-200">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="font-semibold text-zinc-100 max-w-[150px] truncate">
+                {geo.cityName.split(',')[0]}
+              </span>
+            </div>
+            <span className="text-zinc-600">|</span>
+            <div className="flex items-center gap-1.5 text-indigo-300">
+              <Clock className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="text-white font-bold tracking-tight">{geo.localTimeStr}</span>
+              <span className="text-zinc-500 text-[10px]">IST</span>
+            </div>
+          </div>
+
           {onOpenTransfer && (
             <button
               onClick={onOpenTransfer}

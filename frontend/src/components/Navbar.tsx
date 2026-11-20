@@ -12,8 +12,11 @@ import {
   Send,
   ChevronDown,
   Globe,
-  Share2
+  Share2,
+  MapPin,
+  Clock
 } from 'lucide-react';
+import { useGeoLocation } from '../hooks/useGeoLocation';
 import { 
   getStoredCurrency, 
   saveStoredCurrency, 
@@ -43,6 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [currency, setCurrency] = useState<CurrencyConfig>(getStoredCurrency());
   const [showCurrencyDropdown, setShowCurrencyDropdown] = useState(false);
+  const geo = useGeoLocation();
 
   useEffect(() => {
     const handler = (e: any) => {
@@ -205,6 +209,28 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>Send P2P</span>
             </button>
           )}
+
+          {/* Top Real Location & Live Clock Telemetry Pill */}
+          <div 
+            className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-zinc-900/90 border border-white/[0.08] text-xs font-mono shadow-sm"
+            title={`Terminal Coordinates: ${geo.latitude?.toFixed(4)}°, ${geo.longitude?.toFixed(4)}°`}
+          >
+            <div className="flex items-center gap-1.5 text-zinc-200">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="font-semibold text-zinc-100 max-w-[140px] truncate">
+                {geo.cityName.split(',')[0]}
+              </span>
+            </div>
+            <span className="text-zinc-600">|</span>
+            <div className="flex items-center gap-1.5 text-indigo-300">
+              <Clock className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="text-white font-bold tracking-tight">{geo.localTimeStr}</span>
+            </div>
+          </div>
 
           {/* Live Telemetry Ping */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-white/[0.06] text-xs">

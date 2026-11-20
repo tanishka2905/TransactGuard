@@ -11,6 +11,7 @@ import {
 import type { UserSummary, Transaction, CurrencyConfig } from '../types';
 import { api } from '../services/api';
 import { formatCurrencyAmount, getStoredCurrency } from '../utils/currency';
+import { formatLocalTime } from '../utils/date';
 
 interface MultiUserViewProps {
   onOpenTransfer: (senderId?: string, receiverId?: string) => void;
@@ -374,7 +375,7 @@ export const MultiUserView: React.FC<MultiUserViewProps> = ({
                     </div>
 
                     <span className="text-[11px] font-mono text-zinc-400">
-                      ID: {txn.id.slice(0, 14)} · {new Date(txn.timestamp).toLocaleTimeString()}
+                      ID: {txn.id.slice(0, 14)} · {formatLocalTime(txn.timestamp)}
                     </span>
                   </div>
 

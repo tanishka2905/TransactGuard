@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_serializer
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -50,6 +50,14 @@ class TransactionResponse(TransactionBase):
     created_at: datetime
     model_comparison: Optional[Dict[str, Any]] = None
     active_champion_model: Optional[str] = None
+
+    @field_serializer("timestamp", "created_at", check_fields=False)
+    def serialize_datetime(self, dt: datetime, _info):
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            return dt.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        return dt.isoformat()
 
     @model_validator(mode="before")
     @classmethod

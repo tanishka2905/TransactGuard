@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { Transaction, RiskLevel } from '../types';
 import { api } from '../services/api';
+import { formatLocalDateTime } from '../utils/date';
 
 interface HistoryViewProps {
   onSelectTransaction: (txn: Transaction) => void;
@@ -310,7 +311,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ onSelectTransaction })
                     className="hover:bg-white/[0.03] cursor-pointer transition-colors"
                   >
                     <td className="py-2.5 px-4 font-mono text-zinc-400 tabular-nums whitespace-nowrap">
-                      {new Date(txn.timestamp).toLocaleString()}
+                      {formatLocalDateTime(txn.timestamp)}
                     </td>
                     <td className="py-2.5 px-4 font-mono text-white font-medium whitespace-nowrap">
                       {txn.id}

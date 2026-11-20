@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Radio, RefreshCw, Send } from 'lucide-react';
+import { RefreshCw, Send, MapPin, Clock } from 'lucide-react';
 import type { Transaction } from '../types';
 import { LiveTable } from '../components/LiveTable';
+import { useGeoLocation } from '../hooks/useGeoLocation';
 
 interface LiveStreamViewProps {
   transactions: Transaction[];
@@ -20,6 +21,7 @@ export const LiveStreamView: React.FC<LiveStreamViewProps> = ({
 }) => {
   const [selectedRiskFilter, setSelectedRiskFilter] = useState<string>('ALL');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const geo = useGeoLocation();
 
   const handleRefresh = async () => {
     if (onRefresh) {
@@ -36,11 +38,11 @@ export const LiveStreamView: React.FC<LiveStreamViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Stream Header & Diagnostics */}
+      {/* Real-Time Terminal Telemetry & Live Location/Clock Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl bg-zinc-950/70 border border-white/[0.08] glass-panel shadow-xl">
-        <div className="flex items-center gap-3">
-          <div className="relative flex items-center justify-center w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-            <Radio className="w-5 h-5 text-emerald-400" />
+        <div className="flex items-center gap-3.5">
+          <div className="relative flex items-center justify-center w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 shadow-glow-safe">
+            <MapPin className="w-6 h-6 text-emerald-400 animate-pulse" />
             <span className="absolute -top-1 -right-1 flex h-3 w-3">
               {isConnected && (
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -53,17 +55,37 @@ export const LiveStreamView: React.FC<LiveStreamViewProps> = ({
             </span>
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-white font-mono tracking-tight">
-                REAL-TIME TRANSACTION STREAM
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-lg font-bold text-white font-mono tracking-tight flex items-center gap-2">
+                <span>{geo.cityName || 'Detecting Origin Location...'}</span>
               </h1>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800">
-                &lt; 24H BUFFER
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                {geo.isGpsAcquired ? 'REAL GPS ACQUIRED' : 'LIVE TELEMETRY'}
+              </span>
+              {geo.isNight && (
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                  🌙 Night
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400 font-mono mt-1">
+              <span className="flex items-center gap-1.5 text-zinc-200 bg-zinc-900/80 px-2 py-0.5 rounded border border-white/[0.06]">
+                <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="text-white font-bold">{geo.localTimeStr}</span>
+                <span className="text-zinc-500 text-[10px]">IST</span>
+              </span>
+              <span className="text-zinc-600">·</span>
+              <span className="text-zinc-400 text-[11px]">
+                {geo.latitude !== null && geo.longitude !== null
+                  ? `${geo.latitude.toFixed(4)}° N, ${geo.longitude.toFixed(4)}° E`
+                  : 'Coordinates Synchronizing...'}
+              </span>
+              <span className="text-zinc-600">·</span>
+              <span className="text-zinc-500 text-[11px]">
+                ws://localhost:8000/ws/transactions
               </span>
             </div>
-            <p className="text-xs text-zinc-400 font-mono mt-0.5">
-              WebSocket Protocol: ws://localhost:8000/ws/transactions · Channel: live_feed
-            </p>
           </div>
         </div>
 

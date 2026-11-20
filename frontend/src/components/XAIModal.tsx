@@ -28,6 +28,7 @@ import {
 import type { Transaction, CounterfactualResponse, ModelPredictionItem } from '../types';
 import { SideBySideTxnView } from './SideBySideTxnView';
 import { formatCurrencyAmount } from '../utils/currency';
+import { formatLocalDateTime } from '../utils/date';
 import { api } from '../services/api';
 
 interface XAIModalProps {
@@ -285,7 +286,7 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
                 )}
               </div>
               <p className="text-xs text-zinc-400 font-mono mt-1">
-                Timestamp: {new Date(transaction.timestamp).toLocaleString()} · Channel: {transaction.payment_method}
+                Timestamp: {formatLocalDateTime(transaction.timestamp)} · Channel: {transaction.payment_method}
               </p>
             </div>
           </div>

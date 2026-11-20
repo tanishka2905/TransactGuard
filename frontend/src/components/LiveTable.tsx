@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { Transaction, RiskLevel } from '../types';
 import { formatCurrencyAmount } from '../utils/currency';
+import { formatLocalTime, formatRelativeTime } from '../utils/date';
 
 interface LiveTableProps {
   transactions: Transaction[];
@@ -128,14 +129,7 @@ export const LiveTable: React.FC<LiveTableProps> = ({
     }
   };
 
-  const formatTime = (isoString: string) => {
-    try {
-      const d = new Date(isoString);
-      return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    } catch {
-      return isoString;
-    }
-  };
+  const formatTime = (isoString: string) => formatLocalTime(isoString);
 
   return (
     <div className="glass-panel rounded-2xl border border-white/[0.08] overflow-hidden flex flex-col">
@@ -206,7 +200,7 @@ export const LiveTable: React.FC<LiveTableProps> = ({
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="border-b border-white/[0.06] bg-zinc-900/60 text-[11px] font-mono uppercase tracking-wider text-zinc-400">
-              <th className="py-2.5 px-4 font-medium">Time (UTC)</th>
+              <th className="py-2.5 px-4 font-medium">Time (Local)</th>
               <th className="py-2.5 px-4 font-medium">Transaction ID</th>
               <th className="py-2.5 px-4 font-medium">User Profile</th>
               <th className="py-2.5 px-4 font-medium text-right">Amount</th>
@@ -242,8 +236,15 @@ export const LiveTable: React.FC<LiveTableProps> = ({
                     }`}
                   >
                     {/* Timestamp */}
-                    <td className="py-2.5 px-4 font-mono text-zinc-400 tabular-nums whitespace-nowrap">
-                      {formatTime(txn.timestamp)}
+                    <td className="py-2.5 px-4 font-mono text-zinc-300 tabular-nums whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-white tracking-tight">
+                          {formatTime(txn.timestamp)}
+                        </span>
+                        <span className="text-[10px] text-zinc-400 font-mono">
+                          {formatRelativeTime(txn.timestamp)}
+                        </span>
+                      </div>
                     </td>
 
                     {/* Transaction ID */}

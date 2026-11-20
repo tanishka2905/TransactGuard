@@ -127,11 +127,11 @@ export function useGeoLocation(): GeoLocationState {
   // Time state
   const [now, setNow] = useState<Date>(new Date());
 
-  // Update clock every 5 seconds
+  // Update clock every second
   useEffect(() => {
     const timer = setInterval(() => {
       setNow(new Date());
-    }, 5000);
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
 
