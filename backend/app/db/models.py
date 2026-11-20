@@ -16,8 +16,6 @@ class User(Base):
     avatar = Column(String(256), nullable=True)
     city = Column(String(64), default="Moradabad, UP, IN")
     account_number = Column(String(32), nullable=True)
-    security_question = Column(String(256), default="What city was your primary banking branch registered in?")
-    security_answer = Column(String(256), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     behavior_profile = relationship("UserBehaviorProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")

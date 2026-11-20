@@ -183,8 +183,6 @@ export const api = {
     city?: string;
     balance?: number;
     currency?: string;
-    security_question?: string;
-    security_answer?: string;
   }): Promise<UserSummary> {
     const res = await fetch(`${API_BASE}/users`, {
       method: 'POST',

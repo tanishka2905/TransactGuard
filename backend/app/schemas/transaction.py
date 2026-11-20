@@ -259,8 +259,6 @@ class UserCreate(BaseModel):
     balance: Optional[float] = 100000.0
     currency: Optional[str] = "TGX"
     risk_segment: Optional[str] = "LOW"
-    security_question: Optional[str] = "What city was your primary banking branch registered in?"
-    security_answer: Optional[str] = None
 
 class UserResponse(BaseModel):
     id: str
@@ -277,8 +275,6 @@ class UserResponse(BaseModel):
     total_txns: int
     known_devices_count: int
     primary_location: str
-    security_question: Optional[str] = "What city was your primary banking branch registered in?"
-    security_answer: Optional[str] = None
     created_at: Optional[datetime] = None
 
     class Config:

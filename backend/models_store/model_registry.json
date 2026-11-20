@@ -27,8 +27,8 @@
         "false_negative": 0,
         "true_positive": 100
       },
-      "latency_ms": 128.22,
-      "training_time_s": 1.11,
+      "latency_ms": 92.66,
+      "training_time_s": 1.27,
       "file": "rf_classifier.joblib",
       "requires_scaling": false
     },
@@ -48,8 +48,8 @@
         "false_negative": 0,
         "true_positive": 100
       },
-      "latency_ms": 6.06,
-      "training_time_s": 0.48,
+      "latency_ms": 5.83,
+      "training_time_s": 0.36,
       "file": "lgbm_classifier.joblib",
       "requires_scaling": false
     },
@@ -69,8 +69,8 @@
         "false_negative": 0,
         "true_positive": 100
       },
-      "latency_ms": 6.34,
-      "training_time_s": 0.35,
+      "latency_ms": 7.24,
+      "training_time_s": 0.66,
       "file": "xgb_classifier.joblib",
       "requires_scaling": false
     },
@@ -90,8 +90,8 @@
         "false_negative": 2,
         "true_positive": 98
       },
-      "latency_ms": 0.97,
-      "training_time_s": 3.17,
+      "latency_ms": 0.6,
+      "training_time_s": 3.06,
       "file": "mlp_neural_net.joblib",
       "requires_scaling": true
     },
@@ -111,8 +111,8 @@
         "false_negative": 0,
         "true_positive": 100
       },
-      "latency_ms": 0.82,
-      "training_time_s": 0.11,
+      "latency_ms": 0.43,
+      "training_time_s": 0.09,
       "file": "logistic_regression.joblib",
       "requires_scaling": true
     },
@@ -132,7 +132,7 @@
         "false_negative": 0,
         "true_positive": 100
       },
-      "latency_ms": 154.65,
+      "latency_ms": 128.16,
       "training_time_s": 1.2,
       "file": "consensus_ensemble.joblib",
       "requires_scaling": false
@@ -170,5 +170,5 @@
     "velocity_24h",
     "is_new_beneficiary"
   ],
-  "last_trained_timestamp": "2026-11-20T05:02:19Z"
+  "last_trained_timestamp": "2026-11-19T17:19:54Z"
 }

@@ -66,7 +66,7 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
   const [customCityInput, setCustomCityInput] = useState('');
 
   // Adaptive Step-Up Friction State
-  const [securityAnswer, setSecurityAnswer] = useState<string>('');
+  const [securityAnswer, setSecurityAnswer] = useState<string>('Moradabad');
   const [passkeyState, setPasskeyState] = useState<'idle' | 'touching' | 'authenticated'>('idle');
   const [escrowTimeLeft, setEscrowTimeLeft] = useState<number>(900);
 
@@ -92,10 +92,12 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Reset security challenge state on pre-screen
+  // Sync friction defaults from pre-screen
   useEffect(() => {
-    setSecurityAnswer('');
-  }, [preScreenData?.friction_tier]);
+    if (geo.cityName) {
+      setSecurityAnswer(geo.cityName);
+    }
+  }, [geo.cityName]);
 
   // Sync currency changes
   useEffect(() => {
@@ -191,25 +193,8 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
   // Step 2 Action: "Continue Transaction"
   const handleContinueTransaction = async () => {
     try {
-      setErrorMessage(null);
-
-      // Recheck security answer for Medium Risk (Tier 2 Step-Up)
-      if (preScreenData?.friction_tier === 'TIER_2_SECURITY_QUESTION') {
-        const submitted = securityAnswer.trim().toLowerCase();
-        const expected = (sender?.security_answer || (sender?.city ? sender.city.split(',')[0].trim() : 'Moradabad')).toLowerCase();
-        
-        if (!submitted) {
-          setErrorMessage('Security Answer is required to verify identity before proceeding.');
-          return;
-        }
-        const isMatch = (submitted === expected || submitted.includes(expected) || expected.includes(submitted));
-        if (!isMatch) {
-          setErrorMessage(`Security Verification Failed: The answer '${securityAnswer}' does not match the sender's registered credentials. Access denied.`);
-          return;
-        }
-      }
-
       setIsExecuting(true);
+      setErrorMessage(null);
 
       const txn = await api.executeP2PTransfer({
         sender_id: String(senderId),
@@ -819,21 +804,15 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
                     <span>Medium Risk (25–60 pts): Step-up challenge required to confirm cardholder</span>
                   </div>
                   <label className="text-[11px] text-zinc-300 block">
-                    Security Challenge Question: <strong className="text-white">{preScreenData.security_question || sender?.security_question || "What city was your primary banking branch registered in?"}</strong>
+                    Security Question: <strong>What city was your primary banking branch registered in?</strong>
                   </label>
                   <input
                     type="text"
                     value={securityAnswer}
-                    onChange={(e) => {
-                      setSecurityAnswer(e.target.value);
-                      setErrorMessage(null);
-                    }}
-                    placeholder="Type the secret answer configured during registration/login..."
+                    onChange={(e) => setSecurityAnswer(e.target.value)}
+                    placeholder="Enter registered city (e.g. Moradabad)"
                     className="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-amber-500/40 text-white font-mono text-xs focus:outline-none focus:border-amber-400"
                   />
-                  <span className="text-[10px] text-zinc-400 block font-mono">
-                    Identity check: Access is rechecked and only granted if this matches the sender's registered answer.
-                  </span>
                 </div>
               )}
 

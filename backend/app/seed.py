@@ -106,10 +106,7 @@ def run_seed(db: Session):
             name=p["name"],
             email=p["email"],
             phone=p["phone"],
-            city=p.get("city", "Moradabad, UP, IN"),
             risk_segment="LOW",
-            security_question="What city was your primary banking branch registered in?",
-            security_answer=p.get("city", "Moradabad").split(",")[0].strip(),
             created_at=now - datetime.timedelta(days=60)
         )
         db.add(user)

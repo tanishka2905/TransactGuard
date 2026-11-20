@@ -178,8 +178,6 @@ export interface UserSummary {
   known_devices_count: number;
   known_devices?: string[];
   primary_location: string;
-  security_question?: string;
-  security_answer?: string;
   frequent_beneficiaries?: string[];
 }
 
