@@ -844,14 +844,16 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
                     : 'bg-zinc-900/80 border-white/[0.06] hover:border-emerald-500/30'
                 }`}
               >
-                {initialTier === 'TIER_1_ZERO_FRICTION' && (
-                  <span className="absolute top-1.5 right-1.5 text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold uppercase animate-pulse">
-                    Active Tier
-                  </span>
-                )}
-                <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold mb-1">
-                  <Zap className="w-3.5 h-3.5" />
-                  <span>Low Risk (&lt; 25 pts)</span>
+                <div className="flex items-center justify-between gap-1 mb-1.5">
+                  <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold">
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Low (&lt; 25 pts)</span>
+                  </div>
+                  {initialTier === 'TIER_1_ZERO_FRICTION' && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold uppercase animate-pulse shrink-0">
+                      Active
+                    </span>
+                  )}
                 </div>
                 <div className="text-[11px] text-zinc-200 font-semibold">Zero Friction (1-Click)</div>
                 <div className="text-[10px] text-zinc-400 mt-1">Instant 1-click execution for seamless trusted transactions.</div>
@@ -866,14 +868,16 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
                     : 'bg-zinc-900/80 border-white/[0.06] hover:border-amber-500/30'
                 }`}
               >
-                {initialTier === 'TIER_2_SECURITY_QUESTION' && (
-                  <span className="absolute top-1.5 right-1.5 text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold uppercase animate-pulse">
-                    Active Tier
-                  </span>
-                )}
-                <div className="flex items-center gap-1.5 text-amber-400 text-xs font-bold mb-1">
-                  <HelpCircle className="w-3.5 h-3.5" />
-                  <span>Medium Risk (25–60 pts)</span>
+                <div className="flex items-center justify-between gap-1 mb-1.5">
+                  <div className="flex items-center gap-1.5 text-amber-400 text-xs font-bold">
+                    <HelpCircle className="w-3.5 h-3.5" />
+                    <span>Medium (25–60 pts)</span>
+                  </div>
+                  {initialTier === 'TIER_2_SECURITY_QUESTION' && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold uppercase animate-pulse shrink-0">
+                      Active
+                    </span>
+                  )}
                 </div>
                 <div className="text-[11px] text-zinc-200 font-semibold">Security Question Challenge</div>
                 <div className="text-[10px] text-zinc-400 mt-1">Step-up challenge to verify legitimate cardholder presence.</div>
@@ -888,14 +892,16 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
                     : 'bg-zinc-900/80 border-white/[0.06] hover:border-orange-500/30'
                 }`}
               >
-                {initialTier === 'TIER_3_HARDWARE_PASSKEY' && (
-                  <span className="absolute top-1.5 right-1.5 text-[9px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300 border border-orange-500/40 font-bold uppercase animate-pulse">
-                    Active Tier
-                  </span>
-                )}
-                <div className="flex items-center gap-1.5 text-orange-400 text-xs font-bold mb-1">
-                  <KeyRound className="w-3.5 h-3.5" />
-                  <span>High Risk (60–80 pts)</span>
+                <div className="flex items-center justify-between gap-1 mb-1.5">
+                  <div className="flex items-center gap-1.5 text-orange-400 text-xs font-bold">
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>High (60–80 pts)</span>
+                  </div>
+                  {initialTier === 'TIER_3_HARDWARE_PASSKEY' && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300 border border-orange-500/40 font-bold uppercase animate-pulse shrink-0">
+                      Active
+                    </span>
+                  )}
                 </div>
                 <div className="text-[11px] text-zinc-200 font-semibold">Hardware Passkey (FIDO2)</div>
                 <div className="text-[10px] text-zinc-400 mt-1">WebAuthn touch verification to prevent session hijacking.</div>
@@ -910,14 +916,16 @@ export const XAIModal: React.FC<XAIModalProps> = ({ transaction, onClose, onUpda
                     : 'bg-zinc-900/80 border-white/[0.06] hover:border-rose-500/30'
                 }`}
               >
-                {initialTier === 'TIER_4_ESCROW_OR_SOC_REVIEW' && (
-                  <span className="absolute top-1.5 right-1.5 text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold uppercase animate-pulse">
-                    Active Tier
-                  </span>
-                )}
-                <div className="flex items-center gap-1.5 text-rose-400 text-xs font-bold mb-1">
-                  <Timer className="w-3.5 h-3.5" />
-                  <span>Critical Risk (&gt; 80 pts)</span>
+                <div className="flex items-center justify-between gap-1 mb-1.5">
+                  <div className="flex items-center gap-1.5 text-rose-400 text-xs font-bold">
+                    <Timer className="w-3.5 h-3.5" />
+                    <span>Critical (&gt; 80 pts)</span>
+                  </div>
+                  {initialTier === 'TIER_4_ESCROW_OR_SOC_REVIEW' && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold uppercase animate-pulse shrink-0">
+                      Active
+                    </span>
+                  )}
                 </div>
                 <div className="text-[11px] text-zinc-200 font-semibold">15-Min Escrow / SOC Review</div>
                 <div className="text-[10px] text-zinc-400 mt-1">Automated cooling-off quarantine or manual clearance.</div>
