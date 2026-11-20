@@ -211,11 +211,18 @@ def get_live_transactions(
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db)
 ):
-    """Retrieve transactions received within the last 24 hours."""
+    """Retrieve transactions received within the last 24 hours, or the most recent fleet transactions."""
     cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
     txns = db.query(Transaction).filter(
         Transaction.timestamp >= cutoff
     ).order_by(desc(Transaction.timestamp)).limit(limit).all()
+
+    # Backfill so that the live feed and user profiles are always rich and populated
+    if len(txns) < limit:
+        additional = db.query(Transaction).filter(
+            Transaction.timestamp < cutoff
+        ).order_by(desc(Transaction.timestamp)).limit(limit - len(txns)).all()
+        txns.extend(additional)
 
     result = []
     for t in txns:
