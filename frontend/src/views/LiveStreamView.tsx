@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { RefreshCw, Send, MapPin, Clock } from 'lucide-react';
+import { RefreshCw, Send, MapPin, Clock, Edit2 } from 'lucide-react';
 import type { Transaction } from '../types';
 import { LiveTable } from '../components/LiveTable';
 import { useGeoLocation } from '../hooks/useGeoLocation';
+import { LocationModal } from '../components/LocationModal';
 
 interface LiveStreamViewProps {
   transactions: Transaction[];
@@ -21,6 +22,7 @@ export const LiveStreamView: React.FC<LiveStreamViewProps> = ({
 }) => {
   const [selectedRiskFilter, setSelectedRiskFilter] = useState<string>('ALL');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const geo = useGeoLocation();
 
   const handleRefresh = async () => {
@@ -59,6 +61,15 @@ export const LiveStreamView: React.FC<LiveStreamViewProps> = ({
               <h1 className="text-lg font-bold text-white font-mono tracking-tight flex items-center gap-2">
                 <span>{geo.cityName || 'Detecting Origin Location...'}</span>
               </h1>
+              <button
+                type="button"
+                onClick={() => setIsLocationModalOpen(true)}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-white/10 text-[10px] font-mono transition-all cursor-pointer"
+                title="Calibrate GPS or change exact locality"
+              >
+                <Edit2 className="w-3 h-3 text-emerald-400" />
+                <span>Adjust Location</span>
+              </button>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                 {geo.isGpsAcquired ? 'REAL GPS ACQUIRED' : 'LIVE TELEMETRY'}
@@ -189,6 +200,13 @@ export const LiveStreamView: React.FC<LiveStreamViewProps> = ({
         showFilters={true}
         selectedRiskFilter={selectedRiskFilter}
         onRiskFilterChange={setSelectedRiskFilter}
+      />
+
+      {/* Geolocation Calibration & Modal Picker */}
+      <LocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        geo={geo}
       />
     </div>
   );

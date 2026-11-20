@@ -17,6 +17,7 @@ import {
   Clock
 } from 'lucide-react';
 import { useGeoLocation } from '../hooks/useGeoLocation';
+import { LocationModal } from './LocationModal';
 import { 
   getStoredCurrency, 
   saveStoredCurrency, 
@@ -46,6 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [currency, setCurrency] = useState<CurrencyConfig>(getStoredCurrency());
   const [showCurrencyDropdown, setShowCurrencyDropdown] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const geo = useGeoLocation();
 
   useEffect(() => {
@@ -211,17 +213,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
 
           {/* Top Real Location & Live Clock Telemetry Pill */}
-          <div 
-            className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-zinc-900/90 border border-white/[0.08] text-xs font-mono shadow-sm"
-            title={`Terminal Coordinates: ${geo.latitude?.toFixed(4)}°, ${geo.longitude?.toFixed(4)}°`}
+          <button 
+            type="button"
+            onClick={() => setIsLocationModalOpen(true)}
+            className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 border border-white/[0.08] hover:border-emerald-500/40 text-xs font-mono shadow-sm transition-all cursor-pointer group"
+            title="Click to Calibrate Device GPS or Select Exact City"
           >
             <div className="flex items-center gap-1.5 text-zinc-200">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
               </span>
-              <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="font-semibold text-zinc-100 max-w-[140px] truncate">
+              <MapPin className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+              <span className="font-semibold text-zinc-100 max-w-[140px] truncate group-hover:text-emerald-300 transition-colors">
                 {geo.cityName.split(',')[0]}
               </span>
             </div>
@@ -230,7 +234,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Clock className="w-3.5 h-3.5 text-indigo-400" />
               <span className="text-white font-bold tracking-tight">{geo.localTimeStr}</span>
             </div>
-          </div>
+          </button>
 
           {/* Live Telemetry Ping */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-white/[0.06] text-xs">
@@ -259,6 +263,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Geolocation Calibration & Modal Picker */}
+      <LocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        geo={geo}
+      />
     </header>
   );
 };
